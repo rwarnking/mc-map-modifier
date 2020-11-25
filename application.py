@@ -27,26 +27,27 @@ def browse_button(dir, initial):
 source_dir = StringVar()
 source_dir.set(S_DIR)
 source_button = Button(window, text="Browse for source directory.", command=lambda: browse_button(source_dir, S_DIR))
-source_button.grid(row=0, column=0, pady = 10)
+source_button.grid(row=0, column=0, pady = (10, 0))
 lbl1 = Label(window, textvariable=source_dir)
-lbl1.grid(row=1, column=0)
+lbl1.grid(row=1, column=0, pady = (10, 0))
 
 replacement_dir = StringVar()
 replacement_dir.set(R_DIR)
 replacement_button = Button(window, text="Browse for replacement directory.", command=lambda: browse_button(replacement_dir, R_DIR))
-replacement_button.grid(row=2, column=0, pady = 10)
+replacement_button.grid(row=2, column=0, pady = (10, 0))
 lbl1 = Label(window, textvariable=replacement_dir)
-lbl1.grid(row=3, column=0)
+lbl1.grid(row=3, column=0, pady = 10)
 
 # TODO add target folder
 
 # Create checkboxes
+# TODO give option to select block amount
 water_blocks = IntVar()
-Checkbutton(window, text="water_blocks", variable=water_blocks).grid(row=4, sticky=W, padx = 20)
+Checkbutton(window, text="Fix pockets in water.", variable=water_blocks).grid(row=4, sticky=W, padx = 20)
 air_blocks = IntVar()
-Checkbutton(window, text="air_blocks", variable=air_blocks).grid(row=5, sticky=W, padx = 20)
+Checkbutton(window, text="Fix air pockets.", variable=air_blocks).grid(row=5, sticky=W, padx = 20)
 new_blocks = IntVar()
-Checkbutton(window, text="new_blocks", variable=new_blocks).grid(row=6, sticky=W, padx = 20)
+Checkbutton(window, text="Use replacement blocks from other map.", variable=new_blocks).grid(row=6, sticky=W, padx = 20)
 
 # Progress bar widget
 chunk_progress = Progressbar(window, orient = HORIZONTAL, length = 300, mode = 'determinate')
@@ -65,8 +66,30 @@ chunk_label.grid(row=8, sticky=W, padx = 20)
 files_label = Label(window, text="")
 files_label.grid(row=10, sticky=W, padx = 20)
 
-# Create Buttons
-run_button = Button(window, text="Dew it", command=lambda: run(source_dir.get(), chunk_progress, file_progress, chunk_label, files_label, water_blocks, air_blocks, new_blocks))
+# Create details button
+def details():
+    if details_text.hidden:
+        details_text.grid()
+        details_text.hidden = False
+        run_button.grid(row=12)
+    else:
+        details_text.grid_remove()
+        details_text.hidden = True
+        run_button.grid(row=11)
+
+details_button = Button(window, text="Details", command=details)
+details_button.grid(row=10, column=0, sticky=E, padx = 20, pady = 10)
+
+# Details Menu
+details_text = Text(window, height=10, width=35)
+details_scroll = Scrollbar(window, command=details_text.yview)
+details_text.configure(yscrollcommand=details_scroll.set)
+details_text.grid(row=11, column=0, padx = 20, pady = 10)
+details_text.grid_remove()
+details_text.hidden = True
+
+# Create run button
+run_button = Button(window, text="Dew it", command=lambda: run(source_dir.get(), chunk_progress, file_progress, chunk_label, files_label, water_blocks.get(), air_blocks.get(), new_blocks.get(), details_text))
 run_button.grid(row=11, column=0, padx = 20, pady = 10)
 
 window.mainloop()
