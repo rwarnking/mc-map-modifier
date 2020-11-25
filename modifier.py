@@ -84,12 +84,13 @@ def updateProgressBar(progress, value):
 # Checks
 ###################################################################################################
 def checkNeighbours(chunk, x, y, z, blockType):
+    if (x <= 0 or y <= 0 or z <= 0
+        or x >= 15 or y >= 255 or z >= 15):
+        return False
+
     for i in range(x - 1, x + 2):
         for j in range(y - 1, y + 2):
             for k in range(z - 1, z + 2):
-                if (i <= 0 or j <= 0 or k <= 0
-                    or i >= 15 or j >= 255 or k >= 15):
-                    return False
                 if not (x == i and y == j and z == k):
                     block = chunk.get_block(i, j, k)
                     if block.id == blockType:
@@ -147,12 +148,13 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
                 if water_blocks == 1 and checkWaterBlocks(chunk, block, x, y, z):
                     stateArray[x, y, z] = WATERBLOCK
                     changeCountWater += 1
-                elif air_pockets == 1 and solid_blocks == 1 and checkAirPockets(chunk, block, x, y, z):
-                    stateArray[x, y, z] = AIRPOCKET
-                    changeCountAir += 1
                 elif air_pockets == 1 and checkAirPockets(chunk, block, x, y, z):
-                    stateArray[x, y, z] = AIRPOCKET_STONE
+                    if solid_blocks == 1:
+                        stateArray[x, y, z] = AIRPOCKET
+                    else:
+                        stateArray[x, y, z] = AIRPOCKET_STONE
                     changeCountAir += 1
+                    print("hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
                 elif solid_blocks == 1 and checkSolidArea(chunk, block, x, y, z):
                     stateArray[x, y, z] = SOLIDAREA
                     changeCountSolid += 1
@@ -298,7 +300,7 @@ def copyRegion(chunk_progress, chunk_label, src_dir, target_dir, filename, water
 
     print(f'In file {filename}:')
     print(f'Changed {changeCountWater} solid blocks to water.')
-    print(f'Changed {changeCountAir} plocks to solid blocks.')
+    print(f'Changed {changeCountAir} air blocks to solid blocks.')
     print(f'Changed {changeCountSolid} solid blocks to replacement solid blocks.')
 
     # Save to a file
