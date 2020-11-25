@@ -117,7 +117,7 @@ def copyChunk(newRegion, region, chunkX, chunkZ):
 
 
             try:
-                newChunk = newRegion.set_block(b, chunkX * 16 + x, y, chunkZ * 16 + z)
+                newChunk = newRegion.set_block(b, newRegion.x * 512 + chunkX * 16 + x, y, newRegion.z * 512 + chunkZ * 16 + z)
             except:
                 print(f'could not set Block ({x},{y},{z})')
             index += 1
