@@ -8,6 +8,8 @@ import os
 import numpy as np
 
 from tkinter import END
+# TODO
+from tkinter import messagebox
 
 # utilities
 from math import floor
@@ -183,7 +185,6 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
         # Create `Block` objects that are used to set blocks
         stone = anvil.Block('minecraft', 'stone')
         water = anvil.Block('minecraft', 'water')
-        dirt = anvil.Block('minecraft', 'dirt')
 
         # Iterate all blocks and select write the new block to the newChunk
         for block in chunk.stream_chunk():
@@ -193,10 +194,12 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
 
             if stateArray[x, y, z] == WATERBLOCK:
                 b = water
-                print(f'Found water Block ({x},{y},{z}), this should not happen')
+                print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
+                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
             elif stateArray[x, y, z] == AIRPOCKET:
                 b = stone
-                print(f'Found AIRPOCKET Block ({x},{y},{z}), this should not happen')
+                print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
+                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
                 # TODO
             #     newblock = replChunk.get_block(i, j, k)
             #     if newBlock.id == Solid:
@@ -205,7 +208,8 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
             #         b = stone
             elif stateArray[x, y, z] == AIRPOCKET_STONE:
                 b = stone
-                print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}), this should happen')
+                print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should happen')
+                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
             # elif stateArray[x, y, z] == SOLIDAREA:
             #     newBlock = replChunk.get_block(i, j, k)
             #     if newBlock.id == Solid:
@@ -213,9 +217,11 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
             #     else:
             #         b = stone
             elif stateArray[x, y, z] == UNCHECKED:
-                print(f'Found unchecked Block ({x},{y},{z}), this should not happen')
+                print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
+                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
             elif stateArray[x, y, z] != UNCHANGED:
-                print(f'Found unidentified Block ({x},{y},{z}) with {stateArray[x, y, z]}, this should not happen')
+                print(f'Found unidentified Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}) with {stateArray[x, y, z]}, this should not happen')
+                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
 
             try:
                 newChunk = newRegion.set_block(b, newRegion.x * 512 + chunkX * 16 + x, y, newRegion.z * 512 + chunkZ * 16 + z)
@@ -229,78 +235,21 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
             x = (x + 1) % 16
 
         newChunk.set_data(chunk.data)
-
-        #print(f'finished chunk ({chunkX},{chunkZ})')
-    except:
-        print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def copyChunk2(newRegion, region, chunkX, chunkZ):
-    try:
-        chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
-
-        # newChunk = newRegion.add_chunk(anvil.EmptyChunk(chunkX, chunkZ))
-        newChunk = 0
-
-        x = 0
-        y = 0
-        z = 0
-
-        index = 0
-        for block in chunk.stream_chunk():
-            b = block
-            # print(f'{block.id} - ({x},{y},{z}) - {index}')
-            # TODO: compute coordinates from chunk and index
-            # TODO this wants global coordinates but gets region coords
-            # if block.id == 'air' and solidNeighbours(chunk, x, y, z):
-            #     b = dirt
-            #     print(f'Changed: {x} {y} {z}')
-            #     change_count += 1
-
-
-            try:
-                newChunk = newRegion.set_block(b, newRegion.x * 512 + chunkX * 16 + x, y, newRegion.z * 512 + chunkZ * 16 + z)
-            except:
-                print(f'could not set Block ({x},{y},{z})')
-            index += 1
-
-            if z == 15 and x == 15:
-                y += 1
-            if x == 15:
-                z = (z + 1) % 16
-            x = (x + 1) % 16
-
-        newChunk.set_data(chunk.data)
-
-        #print(f'finished chunk ({chunkX},{chunkZ})')
     except:
         print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
 
 ###################################################################################################
 
-def copyRegion(chunk_progress, chunk_label, src_dir, target_dir, filename, water_blocks, air_pockets, solid_blocks):
+def copyRegion(chunk_progress, chunk_label, details_text,
+    src_dir, target_dir, filename,
+    water_blocks, air_pockets, solid_blocks):
+
     l = filename.split('.')
     rX = int(l[1])
     rZ = int(l[2])
 
-    # Create a new region with the `EmptyRegion` class at 0, 0 (in region coords)
+    # Create a new region with the `EmptyRegion` class at region coords
     newRegion = anvil.EmptyRegion(rX, rZ)
-
-    #path = 'original/'
-    #filename = 'r.'+str(rX)+'.'+str(rZ)+'.mca'
-    print(src_dir + "/" + filename)
     region = anvil.Region.from_file(src_dir + "/" + filename)
 
     max_chunkX = 32
@@ -319,14 +268,17 @@ def copyRegion(chunk_progress, chunk_label, src_dir, target_dir, filename, water
             updateProgressBar(chunk_progress, chunkZ + 1 + chunkX * max_chunkZ)
             chunk_label.config(text=f"Finished chunk {chunkX}, {chunkZ} of {max_chunkX - 1}, {max_chunkZ - 1}. And {chunkZ + 1 + chunkX * max_chunkZ} of {max_chunkX * max_chunkZ} chunks.")
 
-    print(f'In file {filename}:')
-    print(f'Changed {changeCountWater} solid blocks to water.')
-    print(f'Changed {changeCountAir} air blocks to solid blocks.')
-    print(f'Changed {changeCountSolid} solid blocks to replacement solid blocks.')
+    # TODO changeCountAir is not reset OBACHT global var
+    if water_blocks + air_pockets + solid_blocks >= 1:
+        details_text.insert(END, f'In file {filename}:\n')
+    if water_blocks == 1:
+        details_text.insert(END, f'Changed {changeCountWater} solid blocks to water.\n')
+    if air_pockets == 1:
+        details_text.insert(END, f'Changed {changeCountAir} air blocks to solid blocks.\n')
+    if solid_blocks == 1:
+        details_text.insert(END, f'Changed {changeCountSolid} solid blocks to replacement solid blocks.\n')
 
     # Save to a file
-    #path = 'original_copy/'
-    #filename = 'r.'+str(rX)+'.'+str(rZ)+'.mca'
     newRegion.save(target_dir + "/" + filename)
 
 ###################################################################################################
@@ -360,7 +312,7 @@ def run(src_dir,
     # Get all files in the directory
     filelist = os.listdir(src_dir)
     if len(filelist) == 0:
-        print("No files found! Select a different source path.")
+        messagebox.showinfo(message="No files found! Select a different source path.", title = "Error")
         return
 
     try:
@@ -368,7 +320,7 @@ def run(src_dir,
         if not os.path.exists(target_dir):
             os.mkdir(target_dir)
     except OSError:
-        print ("Creation of the directory %s failed" % target_dir)
+        messagebox.showinfo(message="Creation of the directory %s failed" % target_dir, title = "Error")
 
     # Update the progressbar and label for the files
     file_progress["maximum"] = len(filelist)
@@ -378,7 +330,9 @@ def run(src_dir,
     i = 1
     for filename in filelist:
         if filename.endswith(".mca"):
-            copyRegion(chunk_progress, chunk_label, src_dir, target_dir, filename, water_blocks, air_pockets, solid_blocks)
+            copyRegion(chunk_progress, chunk_label, details_text,
+                src_dir, target_dir, filename,
+                water_blocks, air_pockets, solid_blocks)
         else:
             continue
         updateProgressBar(file_progress, i)
