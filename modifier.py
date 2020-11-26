@@ -83,6 +83,7 @@ def updateProgressBar(progress, value):
 ###################################################################################################
 # Checks
 ###################################################################################################
+# TODO add range parameter
 def checkNeighbours(chunk, x, y, z, blockType):
     if (x <= 0 or y <= 0 or z <= 0
         or x >= 15 or y >= 255 or z >= 15):
@@ -132,32 +133,38 @@ changeCountAir = 0
 changeCountSolid = 0
 
 def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks):
+    global changeCountWater
+    global changeCountAir
+    global changeCountSolid
     # TODO make try block smaller
     try:
         chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
 
         # Init
-        stateArray = np.zeros((16, 256, 16))
+        stateArray = np.zeros((16, 256, 16), dtype=int)
         x = 0
         y = 0
         z = 0
 
+        # For debugging : block position
+        # if x == 13 and y == 50 and z == 10:
+
         # Check how the chunk should be modified and save it in the stateArray
         for block in chunk.stream_chunk():
             if stateArray[x, y, z] == UNCHECKED:
-                if water_blocks == 1 and checkWaterBlocks(chunk, block, x, y, z):
-                    stateArray[x, y, z] = WATERBLOCK
-                    changeCountWater += 1
-                elif air_pockets == 1 and checkAirPockets(chunk, block, x, y, z):
-                    if solid_blocks == 1:
-                        stateArray[x, y, z] = AIRPOCKET
-                    else:
-                        stateArray[x, y, z] = AIRPOCKET_STONE
+                # if water_blocks == 1 and checkWaterBlocks(chunk, block, x, y, z):
+                #     stateArray[x, y, z] = WATERBLOCK
+                #     changeCountWater += 1
+                #print(air_pockets == 1)
+                if air_pockets == 1 and checkAirPockets(chunk, block, x, y, z):
+                    # if solid_blocks == 1:
+                    #     stateArray[x, y, z] = AIRPOCKET
+                    # else:
+                    stateArray[x, y, z] = AIRPOCKET_STONE
                     changeCountAir += 1
-                    print("hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
-                elif solid_blocks == 1 and checkSolidArea(chunk, block, x, y, z):
-                    stateArray[x, y, z] = SOLIDAREA
-                    changeCountSolid += 1
+                # elif solid_blocks == 1 and checkSolidArea(chunk, block, x, y, z):
+                #     stateArray[x, y, z] = SOLIDAREA
+                #     changeCountSolid += 1
                 else:
                     stateArray[x, y, z] = UNCHANGED
 
@@ -182,9 +189,15 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
         for block in chunk.stream_chunk():
             b = block
 
+            # TODO if air block and not replacement igrnore?
+
             if stateArray[x, y, z] == WATERBLOCK:
                 b = water
-            # elif stateArray[x, y, z] == AIRPOCKET:
+                print(f'Found water Block ({x},{y},{z}), this should not happen')
+            elif stateArray[x, y, z] == AIRPOCKET:
+                b = stone
+                print(f'Found AIRPOCKET Block ({x},{y},{z}), this should not happen')
+                # TODO
             #     newblock = replChunk.get_block(i, j, k)
             #     if newBlock.id == Solid:
             #         b = newBlock
@@ -192,12 +205,17 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
             #         b = stone
             elif stateArray[x, y, z] == AIRPOCKET_STONE:
                 b = stone
+                print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}), this should happen')
             # elif stateArray[x, y, z] == SOLIDAREA:
             #     newBlock = replChunk.get_block(i, j, k)
             #     if newBlock.id == Solid:
             #         b = newBlock
             #     else:
             #         b = stone
+            elif stateArray[x, y, z] == UNCHECKED:
+                print(f'Found unchecked Block ({x},{y},{z}), this should not happen')
+            elif stateArray[x, y, z] != UNCHANGED:
+                print(f'Found unidentified Block ({x},{y},{z}) with {stateArray[x, y, z]}, this should not happen')
 
             try:
                 newChunk = newRegion.set_block(b, newRegion.x * 512 + chunkX * 16 + x, y, newRegion.z * 512 + chunkZ * 16 + z)
@@ -290,6 +308,9 @@ def copyRegion(chunk_progress, chunk_label, src_dir, target_dir, filename, water
     chunk_progress["maximum"] = max_chunkX * max_chunkZ
     chunk_label.config(text=f"Finished chunk 0, 0 of {max_chunkX - 1}, {max_chunkZ - 1}. And 0 of {max_chunkX * max_chunkZ} chunks.")
 
+    # for debugging
+    #for chunkX in range(4, max_chunkX):
+    #    for chunkZ in range(25, max_chunkZ):
     for chunkX in range(max_chunkX):
         for chunkZ in range(max_chunkZ):
 
