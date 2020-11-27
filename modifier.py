@@ -52,7 +52,25 @@ def updateProgressBar(progress, value):
 # Checks
 ###################################################################################################
 # TODO add range parameter
-def checkNeighbours(chunk, x, y, z, blockType):
+def checkNeighboursEQ(chunk, x, y, z, blockType):
+    if (x <= 0 or y <= 0 or z <= 0
+        or x >= 15 or y >= 255 or z >= 15):
+        return False
+
+    for i in range(x - 1, x + 2):
+        for j in range(y - 1, y + 2):
+            for k in range(z - 1, z + 2):
+                if not (x == i and y == j and z == k):
+                    try:
+                        block = chunk.get_block(i, j, k)
+                    except:
+                        print(f'Exception! This should not happen ({x},{y},{z})')
+                        return False
+                    if block.id == blockType:
+                        return False
+    return True
+
+def checkNeighboursNEQ(chunk, x, y, z, blockType):
     if (x <= 0 or y <= 0 or z <= 0
         or x >= 15 or y >= 255 or z >= 15):
         return False
@@ -62,7 +80,7 @@ def checkNeighbours(chunk, x, y, z, blockType):
             for k in range(z - 1, z + 2):
                 if not (x == i and y == j and z == k):
                     block = chunk.get_block(i, j, k)
-                    if block.id == blockType:
+                    if block.id != blockType:
                         return False
     return True
 
@@ -70,20 +88,20 @@ def checkNeighbours(chunk, x, y, z, blockType):
 # TODO this should be a pocket search similar to how the air pockets should be found
 # TODO the marking mechanism does not work because the stateArray is only changed for one block
 def checkWaterBlocks(chunk, block, x, y, z):
-    if block.id == 'dirt':
-        return checkNeighbours(chunk, x, y, z, 'dirt')
+    if block.id == 'stone':
+        return checkNeighboursNEQ(chunk, x, y, z, 'water')
     return False
 
 # TODO
 def checkAirPockets(chunk, block, x, y, z):
     if block.id == 'air':
-        return checkNeighbours(chunk, x, y, z, 'air')
+        return checkNeighboursEQ(chunk, x, y, z, 'air')
     return False
 
 # TODO test not only for stone and air
 def checkSolidArea(chunk, block, x, y, z):
     if block.id == 'stone':
-        return checkNeighbours(chunk, x, y, z, 'air')
+        return checkNeighboursEQ(chunk, x, y, z, 'air')
     return False
 
 ###################################################################################################
@@ -126,17 +144,19 @@ def copyChunk(newRegion, region, replRegion,
         y = 0
         z = 0
 
-        # For debugging : block position
-        # if x == 13 and y == 50 and z == 10:
+        # TODO position that is altered but shouldnt be
+        # (230, 31, 164)
+        # (228, 31, 167)
 
+        #  For debugging : block position
+        # if x == 13 and y == 50 and z == 10:
         # Check how the chunk should be modified and save it in the stateArray
         for block in chunk.stream_chunk():
             if stateArray[x, y, z] == UNCHECKED:
-                # if water_blocks == 1 and checkWaterBlocks(chunk, block, x, y, z):
-                #     stateArray[x, y, z] = WATERBLOCK
-                #     changeCountWater += 1
-                #print(air_pockets == 1)
-                if air_pockets == 1 and checkAirPockets(chunk, block, x, y, z):
+                if water_blocks == 1 and checkWaterBlocks(chunk, block, x, y, z):
+                    stateArray[x, y, z] = WATERBLOCK
+                    changeCountWater += 1
+                elif air_pockets == 1 and checkAirPockets(chunk, block, x, y, z):
                     if solid_blocks == 1:
                         stateArray[x, y, z] = AIRPOCKET
                     else:
@@ -163,6 +183,8 @@ def copyChunk(newRegion, region, replRegion,
         # Create `Block` objects that are used to set blocks
         stone = anvil.Block('minecraft', 'stone')
         water = anvil.Block('minecraft', 'water')
+        diamond_block = anvil.Block('minecraft', 'diamond_block')
+        gold_block = anvil.Block('minecraft', 'gold_block')
 
         # Iterate all blocks and select write the new block to the newChunk
         for block in chunk.stream_chunk():
@@ -172,7 +194,7 @@ def copyChunk(newRegion, region, replRegion,
 
             if stateArray[x, y, z] == WATERBLOCK:
                 b = water
-                print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
+                print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
                 print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
             elif stateArray[x, y, z] == AIRPOCKET:
                 b = stone
@@ -181,11 +203,11 @@ def copyChunk(newRegion, region, replRegion,
                     # TODO solid test
                     if newBlock.id != 'air':
                         b = newBlock
-                print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
+                print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
                 print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
             elif stateArray[x, y, z] == AIRPOCKET_STONE:
-                b = stone
-                print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should happen')
+                b = gold_block
+                print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
                 print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
             elif stateArray[x, y, z] == SOLIDAREA:
                 b = stone
@@ -193,13 +215,15 @@ def copyChunk(newRegion, region, replRegion,
                     newBlock = replChunk.get_block(x, y, z)
                     # TODO solid test
                     if newBlock.id != 'air':
-                        b = newBlock
+                        # b = newBlock
+                        # TODO debug version
+                        b = diamond_block
             elif stateArray[x, y, z] == UNCHECKED:
                 print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
-                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
+                #print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
             elif stateArray[x, y, z] != UNCHANGED:
                 print(f'Found unidentified Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}) with {stateArray[x, y, z]}, this should not happen')
-                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
+                #print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
 
             try:
                 newChunk = newRegion.set_block(b, newRegion.x * 512 + chunkX * 16 + x, y, newRegion.z * 512 + chunkZ * 16 + z)
