@@ -100,13 +100,25 @@ changeCountWater = 0
 changeCountAir = 0
 changeCountSolid = 0
 
-def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks):
+def copyChunk(newRegion, region, replRegion,
+    chunkX, chunkZ,
+    water_blocks, air_pockets, solid_blocks):
+
     global changeCountWater
     global changeCountAir
     global changeCountSolid
     # TODO make try block smaller
     try:
         chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
+
+        replChunk = False
+        if replRegion:
+            try:
+                replChunk = anvil.Chunk.from_region(replRegion, chunkX, chunkZ)
+            except:
+                print(f'Could not create replacement chunk for {chunkX}, {chunkZ}.')
+
+        # print(replRegion, replChunk)
 
         # Init
         stateArray = np.zeros((16, 256, 16), dtype=int)
@@ -125,14 +137,14 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
                 #     changeCountWater += 1
                 #print(air_pockets == 1)
                 if air_pockets == 1 and checkAirPockets(chunk, block, x, y, z):
-                    # if solid_blocks == 1:
-                    #     stateArray[x, y, z] = AIRPOCKET
-                    # else:
-                    stateArray[x, y, z] = AIRPOCKET_STONE
+                    if solid_blocks == 1:
+                        stateArray[x, y, z] = AIRPOCKET
+                    else:
+                        stateArray[x, y, z] = AIRPOCKET_STONE
                     changeCountAir += 1
-                # elif solid_blocks == 1 and checkSolidArea(chunk, block, x, y, z):
-                #     stateArray[x, y, z] = SOLIDAREA
-                #     changeCountSolid += 1
+                elif solid_blocks == 1 and checkSolidArea(chunk, block, x, y, z):
+                    stateArray[x, y, z] = SOLIDAREA
+                    changeCountSolid += 1
                 else:
                     stateArray[x, y, z] = UNCHANGED
 
@@ -164,24 +176,24 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
                 print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
             elif stateArray[x, y, z] == AIRPOCKET:
                 b = stone
+                if replChunk:
+                    newBlock = replChunk.get_block(x, y, z)
+                    # TODO solid test
+                    if newBlock.id != 'air':
+                        b = newBlock
                 print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
                 print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-                # TODO
-            #     newblock = replChunk.get_block(i, j, k)
-            #     if newBlock.id == Solid:
-            #         b = newBlock
-            #     else:
-            #         b = stone
             elif stateArray[x, y, z] == AIRPOCKET_STONE:
                 b = stone
                 print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should happen')
                 print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-            # elif stateArray[x, y, z] == SOLIDAREA:
-            #     newBlock = replChunk.get_block(i, j, k)
-            #     if newBlock.id == Solid:
-            #         b = newBlock
-            #     else:
-            #         b = stone
+            elif stateArray[x, y, z] == SOLIDAREA:
+                b = stone
+                if replChunk:
+                    newBlock = replChunk.get_block(x, y, z)
+                    # TODO solid test
+                    if newBlock.id != 'air':
+                        b = newBlock
             elif stateArray[x, y, z] == UNCHECKED:
                 print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
                 print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
@@ -207,7 +219,7 @@ def copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, soli
 ###################################################################################################
 
 def copyRegion(chunk_progress, chunk_label, details_text,
-    src_dir, target_dir, filename,
+    src_dir, target_dir, repl_dir, filename,
     water_blocks, air_pockets, solid_blocks):
 
     l = filename.split('.')
@@ -218,6 +230,13 @@ def copyRegion(chunk_progress, chunk_label, details_text,
     newRegion = anvil.EmptyRegion(rX, rZ)
     region = anvil.Region.from_file(src_dir + "/" + filename)
 
+    replRegion = False
+    if solid_blocks:
+        try:
+            replRegion = anvil.Region.from_file(repl_dir + "/" + filename)
+        except:
+            print(f'Could not create replacement region for {filename}.')
+
     max_chunkX = 32
     max_chunkZ = 32
     chunk_progress["maximum"] = max_chunkX * max_chunkZ
@@ -226,10 +245,19 @@ def copyRegion(chunk_progress, chunk_label, details_text,
     # for debugging
     #for chunkX in range(4, max_chunkX):
     #    for chunkZ in range(25, max_chunkZ):
+
+
     for chunkX in range(max_chunkX):
+
+        # TODO
+        # import concurrent.futures
+        # executor = concurrent.futures.ProcessPoolExecutor(10)
+        # futures = [executor.submit(copyChunk, newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks) for chunkZ in range(max_chunkZ)]
+        # concurrent.futures.wait(futures)
+
         for chunkZ in range(max_chunkZ):
 
-            copyChunk(newRegion, region, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
+            copyChunk(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
 
             updateProgressBar(chunk_progress, chunkZ + 1 + chunkX * max_chunkZ)
             chunk_label.config(text=f"Finished chunk {chunkX}, {chunkZ} of {max_chunkX - 1}, {max_chunkZ - 1}. And {chunkZ + 1 + chunkX * max_chunkZ} of {max_chunkX * max_chunkZ} chunks.")
@@ -253,7 +281,7 @@ def copyRegion(chunk_progress, chunk_label, details_text,
 ###################################################################################################
 # Main
 ###################################################################################################
-def run(src_dir,
+def run(src_dir, tgt_dir, repl_dir,
     chunk_progress, file_progress,
     chunk_label, files_label,
     water_blocks, air_pockets, solid_blocks,
@@ -286,11 +314,10 @@ def run(src_dir,
         return
 
     try:
-        target_dir = src_dir + "_copy"
-        if not os.path.exists(target_dir):
-            os.mkdir(target_dir)
+        if not os.path.exists(tgt_dir):
+            os.mkdir(tgt_dir)
     except OSError:
-        messagebox.showinfo(message="Creation of the directory %s failed" % target_dir, title = "Error")
+        messagebox.showinfo(message="Creation of the directory %s failed" % tgt_dir, title = "Error")
 
     # Update the progressbar and label for the files
     file_progress["maximum"] = len(filelist)
@@ -299,12 +326,12 @@ def run(src_dir,
     # Iterate the files
     i = 1
     for filename in filelist:
-        # if filename.endswith(".mca"):
-        #     copyRegion(chunk_progress, chunk_label, details_text,
-        #         src_dir, target_dir, filename,
-        #         water_blocks, air_pockets, solid_blocks)
-        # else:
-        #     continue
+        if filename.endswith(".mca"):
+            copyRegion(chunk_progress, chunk_label, details_text,
+                src_dir, tgt_dir, repl_dir, filename,
+                water_blocks, air_pockets, solid_blocks)
+        else:
+            continue
         updateProgressBar(file_progress, i)
         files_label.config(text=f"Finished file {i} of {len(filelist)} files.")
         i += 1
