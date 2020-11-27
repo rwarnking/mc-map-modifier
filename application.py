@@ -40,6 +40,14 @@ replacement_button.grid(row=2, column=0, pady = (10, 0))
 lbl1 = Label(window, textvariable=replacement_dir)
 lbl1.grid(row=3, column=0, padx = PAD_X, pady = 10)
 
+# T_DIR = source_dir + "_copy"
+# target_dir = StringVar()
+# target_dir.set(T_DIR)
+# target_button = Button(window, text="Browse for target directory.", command=lambda: browse_button(target_dir, T_DIR))
+# target_button.grid(row=4, column=0, pady = (10, 0))
+# lbl1 = Label(window, textvariable=target_dir)
+# lbl1.grid(row=5, column=0, padx = PAD_X, pady = 10)
+
 # TODO add target folder
 
 # Create checkboxes
@@ -82,13 +90,14 @@ def details():
         run_button.grid(row=11)
 
 details_button = Button(window, text="Details", command=details)
-details_button.grid(row=10, column=0, sticky=E, padx = PAD_X, pady = 10)
+details_button.grid(row=10, column=0, sticky=E, padx = PAD_X)
 
 # Details Menu
 helper_frame = Frame(window, width=window.winfo_width() - PAD_X * 2, height=100)
 helper_frame.pack_propagate(False)
 details_text = Text(helper_frame, width=0, height=0)
-details_scroll = Scrollbar(window, command=details_text.yview)
+details_scroll = Scrollbar(helper_frame, command=details_text.yview)
+details_scroll.pack(side=RIGHT, fill=Y)
 details_text.configure(yscrollcommand=details_scroll.set)
 details_text.pack(fill="both", expand=True)
 helper_frame.grid(row=11, column=0, padx = PAD_X, pady = 10)

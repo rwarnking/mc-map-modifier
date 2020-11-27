@@ -13,6 +13,9 @@ from tkinter import messagebox
 
 # utilities
 from math import floor
+# TODO
+import time
+import datetime
 from time import gmtime, strftime
 
 def getBlockFromGPos(blockX, blockY, blockZ):
@@ -36,44 +39,7 @@ def getBlockFromGPos(blockX, blockY, blockZ):
     block = chunk.get_block(blockXinChunk, blockY, blockZinChunk)
     return block
 
-
-def printRegion(filename):
-
-    region = anvil.Region.from_file(filename)
-    chunks = 0
-    chunkSum = 0
-
-    for chunkX in range(32):
-        for chunkZ in range(32):
-
-            try:
-                chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
-                chunks += 1
-            except:
-                chunkSum += 1
-                # print(f'did not find chunk ({chunkX},{chunkZ})')
-
-    print(f'found {chunks} chunks')
-
-
 # block = getBlockFromGPos(170, 76, 209)
-# print(block) # <Block(minecraft:air)>
-# print(block.id) # air
-# print(block.properties) # {}
-
-
-# print('.. starting')
-# print(strftime("%Y-%m-%d %H:%M:%S", gmtime()))
-# # copyRegion(0, 0)
-# # printRegion('r.0.0.mca')
-# print('.. finished')
-# print(strftime("%Y-%m-%d %H:%M:%S", gmtime()))
-
-
-
-
-
-
 
 ###################################################################################################
 # Update method
@@ -268,6 +234,9 @@ def copyRegion(chunk_progress, chunk_label, details_text,
             updateProgressBar(chunk_progress, chunkZ + 1 + chunkX * max_chunkZ)
             chunk_label.config(text=f"Finished chunk {chunkX}, {chunkZ} of {max_chunkX - 1}, {max_chunkZ - 1}. And {chunkZ + 1 + chunkX * max_chunkZ} of {max_chunkX * max_chunkZ} chunks.")
 
+    #from thread import start_new_thread
+    #start_new_thread(heron,(99,))
+
     # TODO changeCountAir is not reset OBACHT global var
     if water_blocks + air_pockets + solid_blocks >= 1:
         details_text.insert(END, f'In file {filename}:\n')
@@ -302,12 +271,13 @@ def run(src_dir,
         details_text.insert(END, "Air Blocks will not be fixed!\n")
 
     if (solid_blocks == 1):
-        details_text.insert(END, "New Blocks will be fixed!\n")
+        details_text.insert(END, "Replacement Blocks will be inserted!\n")
     else:
-        details_text.insert(END, "New Blocks will not be inserted!\n")
+        details_text.insert(END, "Replacement Blocks will not be inserted!\n")
 
     details_text.insert(END, "\n.. starting\n")
-    details_text.insert(END, strftime("%Y-%m-%d %H:%M:%S", gmtime()))
+    t1 = gmtime()
+    details_text.insert(END, strftime("%Y-%m-%d %H:%M:%S\n", t1))
 
     # Get all files in the directory
     filelist = os.listdir(src_dir)
@@ -329,16 +299,20 @@ def run(src_dir,
     # Iterate the files
     i = 1
     for filename in filelist:
-        if filename.endswith(".mca"):
-            copyRegion(chunk_progress, chunk_label, details_text,
-                src_dir, target_dir, filename,
-                water_blocks, air_pockets, solid_blocks)
-        else:
-            continue
+        # if filename.endswith(".mca"):
+        #     copyRegion(chunk_progress, chunk_label, details_text,
+        #         src_dir, target_dir, filename,
+        #         water_blocks, air_pockets, solid_blocks)
+        # else:
+        #     continue
         updateProgressBar(file_progress, i)
         files_label.config(text=f"Finished file {i} of {len(filelist)} files.")
         i += 1
 
     # Print that the process is finished
     details_text.insert(END, "\n.. finished\n")
-    details_text.insert(END, strftime("%Y-%m-%d %H:%M:%S", gmtime()))
+    t2 = gmtime()
+    details_text.insert(END, strftime("%Y-%m-%d %H:%M:%S\n", t2))
+    details_text.insert(END, "Total runtime: ")
+    details_text.insert(END, datetime.timedelta(seconds=time.mktime(t2)-time.mktime(t1)))
+
