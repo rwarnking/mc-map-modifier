@@ -11,6 +11,8 @@ from tkinter import END
 # TODO
 from tkinter import messagebox
 
+from block_tests import is_air, is_water, is_transparent, is_solid
+
 # utilities
 from math import floor
 # TODO
@@ -52,25 +54,7 @@ def updateProgressBar(progress, value):
 # Checks
 ###################################################################################################
 # TODO add range parameter
-def checkNeighboursEQ(chunk, x, y, z, blockType):
-    if (x <= 0 or y <= 0 or z <= 0
-        or x >= 15 or y >= 255 or z >= 15):
-        return False
-
-    for i in range(x - 1, x + 2):
-        for j in range(y - 1, y + 2):
-            for k in range(z - 1, z + 2):
-                if not (x == i and y == j and z == k):
-                    try:
-                        block = chunk.get_block(i, j, k)
-                    except:
-                        print(f'Exception! This should not happen ({x},{y},{z})')
-                        return False
-                    if block.id == blockType:
-                        return False
-    return True
-
-def checkNeighboursNEQ(chunk, x, y, z, blockType):
+def check_neighbours_validator(chunk, x, y, z, validator):
     if (x <= 0 or y <= 0 or z <= 0
         or x >= 15 or y >= 255 or z >= 15):
         return False
@@ -80,28 +64,26 @@ def checkNeighboursNEQ(chunk, x, y, z, blockType):
             for k in range(z - 1, z + 2):
                 if not (x == i and y == j and z == k):
                     block = chunk.get_block(i, j, k)
-                    if block.id != blockType:
+                    if validator(block.id):
                         return False
     return True
 
-# TODO multiple types should be possible
 # TODO this should be a pocket search similar to how the air pockets should be found
 # TODO the marking mechanism does not work because the stateArray is only changed for one block
 def checkWaterBlocks(chunk, block, x, y, z):
-    if block.id == 'stone':
-        return checkNeighboursNEQ(chunk, x, y, z, 'water')
+    if is_solid(block.id):
+        return check_neighbours_validator(chunk, x, y, z, lambda s: not is_water(s))
     return False
 
-# TODO
 def checkAirPockets(chunk, block, x, y, z):
-    if block.id == 'air':
-        return checkNeighboursEQ(chunk, x, y, z, 'air')
+    if is_air(block.id):
+        return check_neighbours_validator(chunk, x, y, z, is_transparent)
     return False
 
-# TODO test not only for stone and air
 def checkSolidArea(chunk, block, x, y, z):
-    if block.id == 'stone':
-        return checkNeighboursEQ(chunk, x, y, z, 'air')
+    # TODO what about water? is it in transparent blocks? + lava
+    if is_solid(block.id):
+        return check_neighbours_validator(chunk, x, y, z, is_transparent)
     return False
 
 ###################################################################################################
@@ -125,10 +107,14 @@ def copyChunk(newRegion, region, replRegion,
     global changeCountWater
     global changeCountAir
     global changeCountSolid
-    # TODO make try block smaller
+
+    chunk = None
     try:
         chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
+    except:
+        print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
 
+    if chunk:
         replChunk = False
         if replRegion:
             try:
@@ -237,8 +223,6 @@ def copyChunk(newRegion, region, replRegion,
             x = (x + 1) % 16
 
         newChunk.set_data(chunk.data)
-    except:
-        print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
 
 ###################################################################################################
 
@@ -272,6 +256,7 @@ def copyRegion(chunk_progress, chunk_label, details_text,
 
 
     for chunkX in range(max_chunkX):
+    # for chunkX in range(13, 15):
 
         # TODO
         # import concurrent.futures
@@ -280,6 +265,7 @@ def copyRegion(chunk_progress, chunk_label, details_text,
         # concurrent.futures.wait(futures)
 
         for chunkZ in range(max_chunkZ):
+        # for chunkZ in range(9, 11):
 
             copyChunk(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
 
