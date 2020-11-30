@@ -9,7 +9,8 @@ water_blocks = [
 ]
 
 # CARE: does not contain fences!
-transparent_blocks = water_blocks + [
+# transparent_blocks = water_blocks + [
+transparent_blocks = [
     'air',
     'cave_air',
     # all glass types
@@ -21,12 +22,12 @@ transparent_blocks = water_blocks + [
     'leaves',
     'leaves2',
     # all slabs
-    'stone_slab'
-    'stone_slab2'
-    'wooden_slab',
-    'purpur_slab',
+    # 'stone_slab',
+    # 'stone_slab2',
+    # 'wooden_slab',
+    # 'purpur_slab',
     'lava',
-    'flowing_lava',
+    'flowing_lava'
     # 'water',
     # 'flowing_water'
 ]
@@ -49,8 +50,12 @@ def is_water(block_id):
 def is_fence(block_id):
     return 'fence' in block_id
 
+# TODO does also find double slabs
+def is_slab(block_id):
+    return 'slab' in block_id
+
 def is_transparent(block_id):
-    return block_id in transparent_blocks or is_fence(block_id)
+    return block_id in transparent_blocks or is_fence(block_id) or is_slab(block_id)
 
 def is_solid(block_id):
     return block_id in solid_blocks
