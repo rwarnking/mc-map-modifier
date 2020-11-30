@@ -21,13 +21,6 @@ import datetime
 from time import gmtime, strftime
 
 ###################################################################################################
-# Update method
-###################################################################################################
-def updateProgressBar(progress, value):
-    progress['value'] = value
-    progress.update()
-
-###################################################################################################
 # Checks
 ###################################################################################################
 # TODO add range parameter
@@ -259,15 +252,15 @@ def copyChunk(newRegion, region, replRegion,
 
         # ms = int(round(time.time() * 1000))
 
-        state_array = np.zeros((16, 256, 16), dtype=int)
-        classify(chunk, state_array)
+        classified = np.zeros((16, 256, 16), dtype=int)
+        classify(chunk, classified)
 
         # ms2 = int(round(time.time() * 1000))
         # print(ms2 - ms)
         # ms = int(round(time.time() * 1000))
 
-        state_array2 = np.zeros((16, 256, 16), dtype=int)
-        identify(chunk, state_array, state_array2, water_blocks, air_pockets, solid_blocks)
+        identified = np.zeros((16, 256, 16), dtype=int)
+        identify(chunk, classified, identified, water_blocks, air_pockets, solid_blocks)
 
         # ms2 = int(round(time.time() * 1000))
         # print(ms2 - ms)
@@ -281,7 +274,7 @@ def copyChunk(newRegion, region, replRegion,
             except:
                 print(f'Could not create replacement chunk for {chunkX}, {chunkZ}.')
 
-        modify(state_array2, chunk, replChunk, newRegion, chunkX, chunkZ)
+        modify(identified, chunk, replChunk, newRegion, chunkX, chunkZ)
 
         # ms2 = int(round(time.time() * 1000))
         # print(ms2 - ms)
@@ -410,14 +403,17 @@ def copyChunkOld(newRegion, region, replRegion,
 
         newChunk.set_data(chunk.data)
 
-
-
-
 ###################################################################################################
 
-def copyRegion(chunk_progress, chunk_label, details_text,
-    src_dir, target_dir, repl_dir, filename,
-    water_blocks, air_pockets, solid_blocks):
+def copyRegion(meta_info, filename):
+
+    src_dir = meta_info.source_dir.get()
+    target_dir = meta_info.target_dir.get()
+    repl_dir = meta_info.replacement_dir.get()
+
+    water_blocks = meta_info.water_blocks.get()
+    air_pockets = meta_info.air_pockets.get()
+    solid_blocks = meta_info.repl_blocks.get()
 
     l = filename.split('.')
     rX = int(l[1])
@@ -434,47 +430,31 @@ def copyRegion(chunk_progress, chunk_label, details_text,
         except:
             print(f'Could not create replacement region for {filename}.')
 
-    max_chunkX = 1
-    max_chunkZ = 1
-    # max_chunkX = 32
-    # max_chunkZ = 32
-    chunk_progress["maximum"] = max_chunkX * max_chunkZ
-    chunk_label.config(text=f"Finished chunk 0, 0 of {max_chunkX - 1}, {max_chunkZ - 1}. And 0 of {max_chunkX * max_chunkZ} chunks.")
-
-    # for debugging
-    #for chunkX in range(4, max_chunkX):
-    #    for chunkZ in range(25, max_chunkZ):
-
+    # max_chunkX = 1
+    # max_chunkZ = 1
+    max_chunkX = 32
+    max_chunkZ = 32
+    meta_info.chunk_count_max = max_chunkX * max_chunkZ
 
     for chunkX in range(max_chunkX):
     # for chunkX in range(13, 15):
-
-        # TODO
-        # import concurrent.futures
-        # executor = concurrent.futures.ProcessPoolExecutor(10)
-        # futures = [executor.submit(copyChunk, newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks) for chunkZ in range(max_chunkZ)]
-        # concurrent.futures.wait(futures)
 
         for chunkZ in range(max_chunkZ):
         # for chunkZ in range(9, 11):
 
             copyChunkOld(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
 
-            updateProgressBar(chunk_progress, chunkZ + 1 + chunkX * max_chunkZ)
-            chunk_label.config(text=f"Finished chunk {chunkX}, {chunkZ} of {max_chunkX - 1}, {max_chunkZ - 1}. And {chunkZ + 1 + chunkX * max_chunkZ} of {max_chunkX * max_chunkZ} chunks.")
-
-    #from thread import start_new_thread
-    #start_new_thread(heron,(99,))
+            meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
 
     # TODO changeCountAir is not reset OBACHT global var
     if water_blocks + air_pockets + solid_blocks >= 1:
-        details_text.insert(END, f'In file {filename}:\n')
+        meta_info.text_queue.put(f'In file {filename}:\n')
     if water_blocks == 1:
-        details_text.insert(END, f'Changed {changeCountWater} solid blocks to water.\n')
+        meta_info.text_queue.put(f'Changed {changeCountWater} solid blocks to water.\n')
     if air_pockets == 1:
-        details_text.insert(END, f'Changed {changeCountAir} air blocks to solid blocks.\n')
+        meta_info.text_queue.put(f'Changed {changeCountAir} air blocks to solid blocks.\n')
     if solid_blocks == 1:
-        details_text.insert(END, f'Changed {changeCountSolid} solid blocks to replacement solid blocks.\n')
+        meta_info.text_queue.put(f'Changed {changeCountSolid} solid blocks to replacement solid blocks.\n')
 
     # Save to a file
     newRegion.save(target_dir + "/" + filename)
@@ -482,39 +462,36 @@ def copyRegion(chunk_progress, chunk_label, details_text,
 ###################################################################################################
 # Main
 ###################################################################################################
-def run(src_dir, tgt_dir, repl_dir,
-    chunk_progress, file_progress,
-    chunk_label, files_label,
-    water_blocks, air_pockets, solid_blocks,
-    details_text):
+def run(meta_info):
 
     # Print detailed informations
-    if (water_blocks == 1):
-        details_text.insert(END, "Water Blocks will be fixed!\n")
+    if (meta_info.water_blocks.get() == 1):
+        meta_info.text_queue.put("Water Blocks will be fixed!\n")
     else:
-        details_text.insert(END, "Water Blocks will not be fixed!\n")
+        meta_info.text_queue.put("Water Blocks will not be fixed!\n")
 
-    if (air_pockets == 1):
-        details_text.insert(END, "Air Blocks will be fixed!\n")
+    if (meta_info.air_pockets.get() == 1):
+        meta_info.text_queue.put("Air Blocks will be fixed!\n")
     else:
-        details_text.insert(END, "Air Blocks will not be fixed!\n")
+        meta_info.text_queue.put("Air Blocks will not be fixed!\n")
 
-    if (solid_blocks == 1):
-        details_text.insert(END, "Replacement Blocks will be inserted!\n")
+    if (meta_info.repl_blocks.get() == 1):
+        meta_info.text_queue.put("Replacement Blocks will be inserted!\n")
     else:
-        details_text.insert(END, "Replacement Blocks will not be inserted!\n")
+        meta_info.text_queue.put("Replacement Blocks will not be inserted!\n")
 
-    details_text.insert(END, "\n.. starting\n")
+    meta_info.text_queue.put("\n.. starting\n")
     t1 = gmtime()
-    details_text.insert(END, strftime("%Y-%m-%d %H:%M:%S\n", t1))
-    ms = int(round(time.time() * 1000))
+    meta_info.text_queue.put(strftime("%Y-%m-%d %H:%M:%S\n", t1))
+    # ms = int(round(time.time() * 1000))
 
     # Get all files in the directory
-    filelist = os.listdir(src_dir)
+    filelist = os.listdir(meta_info.source_dir.get())
     if len(filelist) == 0:
         messagebox.showinfo(message="No files found! Select a different source path.", title = "Error")
         return
 
+    tgt_dir = meta_info.target_dir.get()
     try:
         if not os.path.exists(tgt_dir):
             os.mkdir(tgt_dir)
@@ -522,29 +499,57 @@ def run(src_dir, tgt_dir, repl_dir,
         messagebox.showinfo(message="Creation of the directory %s failed" % tgt_dir, title = "Error")
 
     # Update the progressbar and label for the files
-    file_progress["maximum"] = len(filelist)
-    files_label.config(text=f"Finished file {0} of {len(filelist)} files.")
+    meta_info.file_count_max = len(filelist)
 
     # Iterate the files
     i = 1
     for filename in filelist:
         if filename.endswith(".mca"):
-            copyRegion(chunk_progress, chunk_label, details_text,
-                src_dir, tgt_dir, repl_dir, filename,
-                water_blocks, air_pockets, solid_blocks)
+            copyRegion(meta_info, filename)
         else:
             continue
-        updateProgressBar(file_progress, i)
-        files_label.config(text=f"Finished file {i} of {len(filelist)} files.")
+        meta_info.file_count = i
         i += 1
 
     # Print that the process is finished
-    details_text.insert(END, "\n.. finished\n")
+    meta_info.text_queue.put("\n.. finished\n")
     t2 = gmtime()
-    details_text.insert(END, strftime("%Y-%m-%d %H:%M:%S\n", t2))
-    details_text.insert(END, "Total runtime: ")
-    details_text.insert(END, datetime.timedelta(seconds=time.mktime(t2)-time.mktime(t1)))
+    meta_info.text_queue.put(strftime("%Y-%m-%d %H:%M:%S\n", t2))
+    meta_info.text_queue.put("Total runtime: ")
+    meta_info.text_queue.put(datetime.timedelta(seconds=time.mktime(t2)-time.mktime(t1)))
+
+    # ms2 = int(round(time.time() * 1000))
+    # print(ms2 - ms)
+
+    meta_info.finished = True
+
+import queue
+def runloop(meta_info):
+    result = 0
+
+    max = 10000000
+    # meta_info.file_progress["maximum"] = max
+    # meta_info.chunk_progress["maximum"] = max
+    meta_info.chunk_count_max = max
+    meta_info.file_count_max = max
+
+    print(meta_info.source_dir.get())
+    print(meta_info.replacement_dir.get())
+    print(meta_info.target_dir.get())
+
+    for i in range(max):
+        #Do something with result
+        result = result + 1
+
+        meta_info.chunk_count = result
+        meta_info.file_count = result
+        # if (i % 1000):
+        #     meta_info.text_queue.put("Hi\n")
+        # meta_info.file_count = result
+        # meta_info.chunk_progress["value"] = result
+        # meta_info.file_progress["value"] = result
 
 
-    ms2 = int(round(time.time() * 1000))
-    print(ms2 - ms)
+
+
+    meta_info.finished = True

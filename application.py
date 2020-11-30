@@ -1,127 +1,175 @@
 from tkinter import filedialog
+from tkinter import messagebox
 from tkinter import *
 from tkinter.ttk import *
+
+import queue
+import threading
 
 # Needed for the username
 import os
 
 # own imports
 from modifier import run
-
-# Create the window
-window = Tk()
-# Set the title
-window.title("mc-map-modifier")
+from modifier import runloop
+from meta_information import MetaInformation
 
 PAD_X = 20
+PAD_Y = (10, 0)
 
 # Test path
 S_DIR = "C:/Users/"+os.getlogin()+"/Projekte/mc-map-modifier/original"
-
 #S_DIR = "C:/Users/"+os.getlogin()+"/AppData/Roaming/.minecraft/saves"
 #R_DIR = "C:/Users/"+os.getlogin()+"/AppData/Roaming/.minecraft/saves"
 
-def browse_button(dir, initial):
-    filename = filedialog.askdirectory(initialdir = initial)
-    dir.set(filename)
+class MainApp():
 
-# TODO the other directorys are not updated automatically if the first one changes
-# but obacht that should not happen if the 2nd or 3rd are already changed
-source_dir = StringVar()
-source_dir.set(S_DIR)
-source_button = Button(window, text="Browse for source directory.", command=lambda: browse_button(source_dir, S_DIR))
-source_button.grid(row=0, column=0, pady = (10, 0))
-lbl1 = Label(window, textvariable=source_dir)
-lbl1.grid(row=1, column=0, padx = PAD_X, pady = (10, 0))
+    def __init__(self, window):
 
-R_DIR = source_dir.get() + "_replacement"
-replacement_dir = StringVar()
-replacement_dir.set(R_DIR)
-replacement_button = Button(window, text="Browse for replacement directory.", command=lambda: browse_button(replacement_dir, R_DIR))
-replacement_button.grid(row=2, column=0, pady = (10, 0))
-lbl1 = Label(window, textvariable=replacement_dir)
-lbl1.grid(row=3, column=0, padx = PAD_X, pady = (10, 0))
+        self.meta_info = MetaInformation()
 
-T_DIR = source_dir.get() + "_copy"
-target_dir = StringVar()
-target_dir.set(T_DIR)
-target_button = Button(window, text="Browse for target directory.", command=lambda: browse_button(target_dir, T_DIR))
-target_button.grid(row=4, column=0, pady = (10, 0))
-lbl1 = Label(window, textvariable=target_dir)
-lbl1.grid(row=5, column=0, padx = PAD_X, pady = 10)
+        self.init_resource_folder(window)
+        self.init_checkbuttons(window)
+        self.init_progressindicator(window)
+        self.init_details(window)
 
-# TODO add target folder
+        self.run_button = Button(window, text="Dew it", command=lambda: self.run(window))
+        self.run_button.grid(row=13, column=0, padx = PAD_X, pady = 10)
 
-# Create checkboxes
-# TODO give option to select block amount
-water_blocks = IntVar()
-Checkbutton(window, text="Fix pockets in water.", variable=water_blocks).grid(row=6, sticky=W, padx = PAD_X)
+    def run(self, window):
+        if not self.meta_info.finished:
+            messagebox.showinfo(message="Modification is already happening.", title = "Error")
+            window.after(50, lambda: self.listen_for_result(window))
+            return
 
-# Label(master, text="First Name").grid(row=0)
-# Label(master, text="Last Name").grid(row=1)
+        self.meta_info.finished = False
+        self.new_thread = threading.Thread(
+            # target=runloop,
+            target=run,
+            kwargs={'meta_info':self.meta_info})
+        self.new_thread.start()
+        window.after(50, lambda: self.listen_for_result(window))
 
-Entry(window, width=5).grid(row=6, sticky=E, padx = (0, 20))
-Entry(window, width=5).grid(row=7, sticky=E, padx = (0, 20))
-Entry(window, width=5).grid(row=8, sticky=E, padx = (0, 20))
+    def listen_for_result(self, window):
+        # TODO setting the maximum here is not optimal but its better than doing it in the modifier
+        c_count = self.meta_info.chunk_count
+        c_count_max = self.meta_info.chunk_count_max
+        f_count = self.meta_info.file_count
+        f_count_max = self.meta_info.file_count_max
+        self.chunk_progress["value"] = c_count
+        self.chunk_progress["maximum"] = c_count_max
+        self.chunk_progress.update()
 
+        self.file_progress["value"] = f_count
+        self.file_progress["maximum"] = f_count_max
+        self.file_progress.update()
 
-air_blocks = IntVar()
-Checkbutton(window, text="Fix air pockets.", variable=air_blocks).grid(row=7, sticky=W, padx = PAD_X)
-new_blocks = IntVar()
-Checkbutton(window, text="Use replacement blocks from other map.", variable=new_blocks).grid(row=8, sticky=W, padx = PAD_X)
+        if not self.meta_info.text_queue.empty():
+            self.details_text.insert(END, self.meta_info.text_queue.get(0))
 
-# Update to get the correct width for the progressbar
-window.update()
-# Progress bar widget
-chunk_progress = Progressbar(window, orient = HORIZONTAL, length = window.winfo_width(), mode = 'determinate')
-chunk_progress["value"] = 0
-chunk_progress.update()
-chunk_progress.grid(row=9, sticky=W, padx = PAD_X, pady = 10)
+        if self.meta_info.finished:
+            self.chunk_label.config(text=f"Finished all chunks of {c_count_max} chunks.")
+            self.file_label.config(text=f"Finished all files of {f_count_max} files.")
+        else:
+            # TODO
+            # self.chunk_label.config(text=f"Finished chunk {chunkX}, {chunkZ} of {max_chunkX - 1}, {max_chunkZ - 1}. And {c_count} of {c_count_max} chunks.")
+            self.chunk_label.config(text=f"Finished chunk TODO. And {c_count} of {c_count_max} chunks.")
+            self.file_label.config(text=f"Finished file {f_count} of {f_count_max} files.")
+            window.after(50, lambda: self.listen_for_result(window))
 
-file_progress = Progressbar(window, orient = HORIZONTAL, length = window.winfo_width(), mode = 'determinate')
-file_progress["value"] = 0
-file_progress.update()
-file_progress.grid(row=11, sticky=W, padx = PAD_X, pady = 10)
+    ###############################################################################################
+    # Initialisation functions
+    ###############################################################################################
+    def init_resource_folder(self, window):
 
-# Progress label
-chunk_label = Label(window, text="")
-chunk_label.grid(row=10, sticky=W, padx = PAD_X)
-files_label = Label(window, text="")
-files_label.grid(row=12, sticky=W, padx = PAD_X)
+        def browse_button(dir, initial):
+            filename = filedialog.askdirectory(initialdir = initial)
+            dir.set(filename)
 
-# Create details button
-def details():
-    if helper_frame.hidden:
-        helper_frame.grid()
-        helper_frame.hidden = False
-        run_button.grid(row=14)
-    else:
+        self.meta_info.set_dirs(S_DIR, S_DIR + "_replacement", S_DIR + "_copy")
+
+        # TODO the other directorys are not updated automatically if the first one changes
+        # but obacht that should not happen if the 2nd or 3rd are already changed
+        source_button = Button(window, text="Browse for source directory.", command=lambda: browse_button(self.meta_info.source_dir, S_DIR))
+        source_button.grid(row=0, column=0, pady = PAD_Y)
+        lbl1 = Label(window, textvariable=self.meta_info.source_dir)
+        lbl1.grid(row=1, column=0, padx = PAD_X, pady = PAD_Y)
+
+        replacement_button = Button(window, text="Browse for replacement directory.", command=lambda: browse_button(self.meta_info.replacement_dir, S_DIR + "_replacement"))
+        replacement_button.grid(row=2, column=0, pady = PAD_Y)
+        lbl1 = Label(window, textvariable=self.meta_info.replacement_dir)
+        lbl1.grid(row=3, column=0, padx = PAD_X, pady = PAD_Y)
+
+        target_button = Button(window, text="Browse for target directory.", command=lambda: browse_button(self.meta_info.target_dir, S_DIR + "_copy"))
+        target_button.grid(row=4, column=0, pady = PAD_Y)
+        lbl1 = Label(window, textvariable=self.meta_info.target_dir)
+        lbl1.grid(row=5, column=0, padx = PAD_X, pady = 10)
+
+    def init_checkbuttons(self, window):
+        # Create checkboxes
+        Checkbutton(window, text="Fix pockets in water.", variable=self.meta_info.water_blocks).grid(row=6, sticky=W, padx = PAD_X)
+        Checkbutton(window, text="Fix air pockets.", variable=self.meta_info.air_pockets).grid(row=7, sticky=W, padx = PAD_X)
+        Checkbutton(window, text="Use replacement blocks from other map.", variable=self.meta_info.repl_blocks).grid(row=8, sticky=W, padx = PAD_X)
+
+        # TODO give option to select block amount
+        # Label(master, text="First Name").grid(row=0)
+        # Label(master, text="Last Name").grid(row=1)
+        Entry(window, width=5).grid(row=6, sticky=E, padx = (0, 20))
+        Entry(window, width=5).grid(row=7, sticky=E, padx = (0, 20))
+        Entry(window, width=5).grid(row=8, sticky=E, padx = (0, 20))
+
+    def init_progressindicator(self, window):
+        # Update to get the correct width for the progressbar
+        window.update()
+        # Progress bar widget
+        self.chunk_progress = Progressbar(window, orient = HORIZONTAL, length = window.winfo_width(), mode = 'determinate')
+        self.chunk_progress["value"] = 0
+        self.chunk_progress.update()
+        self.chunk_progress.grid(row=9, sticky=W, padx = PAD_X, pady = 10)
+
+        self.file_progress = Progressbar(window, orient = HORIZONTAL, length = window.winfo_width(), mode = 'determinate')
+        self.file_progress["value"] = 0
+        self.file_progress.update()
+        self.file_progress.grid(row=11, sticky=W, padx = PAD_X, pady = 10)
+
+        # Progress label
+        self.chunk_label = Label(window, text="Program is not yet running!")
+        self.chunk_label.grid(row=10, sticky=E, padx = PAD_X)
+        self.file_label = Label(window, text="Program is not yet running!")
+        self.file_label.grid(row=12, sticky=E, padx = PAD_X)
+
+    def init_details(self, window):
+        # Create details button
+        def details():
+            if helper_frame.hidden:
+                helper_frame.grid()
+                helper_frame.hidden = False
+                self.run_button.grid(row=14)
+            else:
+                helper_frame.grid_remove()
+                helper_frame.hidden = True
+                self.run_button.grid(row=13)
+
+        details_button = Button(window, text="Details", command=details)
+        details_button.grid(row=12, column=0, sticky=W, padx = PAD_X)
+
+        # Details Menu
+        helper_frame = Frame(window, width=window.winfo_width() - PAD_X * 2, height=100)
+        helper_frame.pack_propagate(False)
+        self.details_text = Text(helper_frame, width=0, height=0)
+        details_scroll = Scrollbar(helper_frame, command=self.details_text.yview)
+        details_scroll.pack(side=RIGHT, fill=Y)
+        self.details_text.configure(yscrollcommand=details_scroll.set)
+        self.details_text.pack(fill="both", expand=True)
+        helper_frame.grid(row=13, column=0, padx = PAD_X, pady = 10)
         helper_frame.grid_remove()
         helper_frame.hidden = True
-        run_button.grid(row=13)
 
-details_button = Button(window, text="Details", command=details)
-details_button.grid(row=12, column=0, sticky=E, padx = PAD_X)
-
-# Details Menu
-helper_frame = Frame(window, width=window.winfo_width() - PAD_X * 2, height=100)
-helper_frame.pack_propagate(False)
-details_text = Text(helper_frame, width=0, height=0)
-details_scroll = Scrollbar(helper_frame, command=details_text.yview)
-details_scroll.pack(side=RIGHT, fill=Y)
-details_text.configure(yscrollcommand=details_scroll.set)
-details_text.pack(fill="both", expand=True)
-helper_frame.grid(row=13, column=0, padx = PAD_X, pady = 10)
-helper_frame.grid_remove()
-helper_frame.hidden = True
-
-# Create run button
-run_button = Button(window, text="Dew it", command=lambda: run(
-    source_dir.get(), target_dir.get(), replacement_dir.get(),
-    chunk_progress, file_progress, chunk_label, files_label,
-    water_blocks.get(), air_blocks.get(), new_blocks.get(),
-    details_text)
-)
-run_button.grid(row=13, column=0, padx = PAD_X, pady = 10)
-
-window.mainloop()
+###################################################################################################
+# Main
+###################################################################################################
+if __name__ == "__main__":
+    window = Tk()
+    window.title("mc-map-modifier")
+    main_app = MainApp(window)
+    window.mainloop()
