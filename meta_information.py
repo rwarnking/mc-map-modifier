@@ -15,6 +15,8 @@ class MetaInformation():
         self.repl_blocks = IntVar()
 
         self.text_queue = queue.Queue()
+        self.elapsed_time = 0
+        self.estimated_time = 0
 
         self.finished = True
 

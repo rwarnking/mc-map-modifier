@@ -7,18 +7,21 @@ import os
 # For array manipulations
 import numpy as np
 
-from tkinter import END
-# TODO
-from tkinter import messagebox
-
-from block_tests import is_air, is_water, is_transparent, is_solid
-
-# utilities
+# Utilities
 from math import floor
+import queue
+
 # TODO
 import time
 import datetime
 from time import gmtime, strftime
+
+# TODO
+from tkinter import END
+from tkinter import messagebox
+
+# Own imports
+from block_tests import is_air, is_water, is_transparent, is_solid
 
 ###################################################################################################
 # VERSION 1.0
@@ -431,18 +434,25 @@ def copyRegion(meta_info, filename):
     # max_chunkZ = 1
     max_chunkX = 32
     max_chunkZ = 32
+    meta_info.chunk_count = 0
     meta_info.chunk_count_max = max_chunkX * max_chunkZ
+    meta_info.estimated_time = meta_info.chunk_count_max * meta_info.file_count_max
 
     for chunkX in range(max_chunkX):
     # for chunkX in range(13, 15):
 
+        ms = int(round(time.time() * 1000))
         for chunkZ in range(max_chunkZ):
         # for chunkZ in range(7, 11):
-
             # copyChunkOld(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
             copyChunk(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
-
             meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
+
+        ms2 = int(round(time.time() * 1000))
+        meta_info.elapsed_time += (ms2 - ms) / 1000
+        t_per_chunk = meta_info.elapsed_time / (meta_info.chunk_count_max * meta_info.file_count + meta_info.chunk_count)
+        meta_info.estimated_time = ((meta_info.chunk_count_max - meta_info.chunk_count) \
+            + (meta_info.file_count_max - meta_info.file_count - 1) * meta_info.chunk_count_max) * t_per_chunk
 
     # TODO changeCountAir is not reset OBACHT global var
     if water_blocks + air_pockets + solid_blocks >= 1:
@@ -518,36 +528,5 @@ def run(meta_info):
 
     ms2 = int(round(time.time() * 1000))
     print(f"Total time elapsed: {ms2 - ms}")
-
-    meta_info.finished = True
-
-import queue
-def runloop(meta_info):
-    result = 0
-
-    max = 10000000
-    # meta_info.file_progress["maximum"] = max
-    # meta_info.chunk_progress["maximum"] = max
-    meta_info.chunk_count_max = max
-    meta_info.file_count_max = max
-
-    print(meta_info.source_dir.get())
-    print(meta_info.replacement_dir.get())
-    print(meta_info.target_dir.get())
-
-    for i in range(max):
-        #Do something with result
-        result = result + 1
-
-        meta_info.chunk_count = result
-        meta_info.file_count = result
-        # if (i % 1000):
-        #     meta_info.text_queue.put("Hi\n")
-        # meta_info.file_count = result
-        # meta_info.chunk_progress["value"] = result
-        # meta_info.file_progress["value"] = result
-
-
-
 
     meta_info.finished = True
