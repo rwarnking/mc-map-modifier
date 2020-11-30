@@ -21,6 +21,10 @@ import datetime
 from time import gmtime, strftime
 
 ###################################################################################################
+# VERSION 1.0
+###################################################################################################
+
+###################################################################################################
 # Checks
 ###################################################################################################
 # TODO add range parameter
@@ -47,30 +51,148 @@ def checkWaterBlocks(chunk, block, x, y, z):
 
 def checkAirPockets(chunk, block, x, y, z):
     if is_air(block.id):
-        return check_neighbours_validator(chunk, x, y, z, is_transparent)
+        return check_neighbours_validator(chunk, x, y, z, lambda s: is_transparent(s) or is_water(s))
     return False
 
 def checkSolidArea(chunk, block, x, y, z):
     # TODO what about water? is it in transparent blocks? + lava
     if is_solid(block.id):
-        return check_neighbours_validator(chunk, x, y, z, is_transparent)
+        return check_neighbours_validator(chunk, x, y, z, lambda s: is_transparent(s) or is_water(s))
     return False
 
+###################################################################################################
+# Copy
+###################################################################################################
+def copyChunkOld(newRegion, region, replRegion,
+    chunkX, chunkZ,
+    water_blocks, air_pockets, solid_blocks):
 
+    global changeCountWater
+    global changeCountAir
+    global changeCountSolid
 
+    chunk = None
+    try:
+        chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
+    except:
+        print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
 
+    if chunk:
+        replChunk = False
+        if replRegion:
+            try:
+                replChunk = anvil.Chunk.from_region(replRegion, chunkX, chunkZ)
+            except:
+                print(f'Could not create replacement chunk for {chunkX}, {chunkZ}.')
 
+        # print(replRegion, replChunk)
 
+        # Init
+        stateArray = np.zeros((16, 256, 16), dtype=int)
+        x = 0
+        y = 0
+        z = 0
 
+        # TODO position that is altered but shouldnt be
+        # (230, 31, 164)
+        # (228, 31, 167)
 
+        #  For debugging : block position
+        # if x == 13 and y == 50 and z == 10:
+        # Check how the chunk should be modified and save it in the stateArray
+        for block in chunk.stream_chunk():
+            if stateArray[x, y, z] == UNCHECKED:
+                if water_blocks == 1 and checkWaterBlocks(chunk, block, x, y, z):
+                    stateArray[x, y, z] = WATERBLOCK
+                    changeCountWater += 1
+                elif air_pockets == 1 and checkAirPockets(chunk, block, x, y, z):
+                    if solid_blocks == 1:
+                        stateArray[x, y, z] = AIRPOCKET
+                    else:
+                        stateArray[x, y, z] = AIRPOCKET_STONE
+                    changeCountAir += 1
+                elif solid_blocks == 1 and checkSolidArea(chunk, block, x, y, z):
+                    stateArray[x, y, z] = SOLIDAREA
+                    changeCountSolid += 1
+                else:
+                    stateArray[x, y, z] = UNCHANGED
 
+            if z == 15 and x == 15:
+                y += 1
+            if x == 15:
+                z = (z + 1) % 16
+            x = (x + 1) % 16
 
+        # Reset
+        newChunk = 0
+        x = 0
+        y = 0
+        z = 0
 
+        # Create `Block` objects that are used to set blocks
+        stone = anvil.Block('minecraft', 'stone')
+        water = anvil.Block('minecraft', 'water')
+        diamond_block = anvil.Block('minecraft', 'diamond_block')
+        gold_block = anvil.Block('minecraft', 'gold_block')
 
+        # Iterate all blocks and select write the new block to the newChunk
+        for block in chunk.stream_chunk():
+            b = block
 
+            # TODO if air block and not replacement igrnore?
 
+            xyz = stateArray[x, y, z]
+            if xyz == WATERBLOCK:
+                b = water
+                print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
+                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
+            elif xyz == AIRPOCKET:
+                b = stone
+                if replChunk:
+                    newBlock = replChunk.get_block(x, y, z)
+                    if is_solid(newBlock.id):
+                        b = newBlock
+                print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
+                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
+            elif xyz == AIRPOCKET_STONE:
+                b = gold_block
+                print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
+                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
+            elif xyz == SOLIDAREA:
+                b = stone
+                if replChunk:
+                    newBlock = replChunk.get_block(x, y, z)
+                    if is_solid(newBlock.id):
+                        # b = newBlock
+                        # TODO debug version
+                        b = diamond_block
+            elif xyz == UNCHECKED:
+                print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
+                #print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
+            elif xyz != UNCHANGED:
+                print(f'Found unidentified Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}) with {stateArray[x, y, z]}, this should not happen')
+                #print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
 
+            try:
+                newChunk = newRegion.set_block(b, newRegion.x * 512 + chunkX * 16 + x, y, newRegion.z * 512 + chunkZ * 16 + z)
+            except:
+                print(f'could not set Block ({x},{y},{z})')
 
+            if z == 15 and x == 15:
+                y += 1
+            if x == 15:
+                z = (z + 1) % 16
+            x = (x + 1) % 16
+
+        newChunk.set_data(chunk.data)
+
+###################################################################################################
+# VERSION 2.0
+###################################################################################################
+
+###################################################################################################
+# Checks
+###################################################################################################
 def check_neighbours_validator2(state_array, x, y, z, validator, amount = 1):
     if (x <= 0 or y <= 0 or z <= 0
         or x >= 15 or y >= 255 or z >= 15):
@@ -241,7 +363,6 @@ def copyChunk(newRegion, region, replRegion,
     global changeCountAir
     global changeCountSolid
 
-
     chunk = None
     try:
         chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
@@ -278,130 +399,6 @@ def copyChunk(newRegion, region, replRegion,
 
         # ms2 = int(round(time.time() * 1000))
         # print(ms2 - ms)
-
-
-def copyChunkOld(newRegion, region, replRegion,
-    chunkX, chunkZ,
-    water_blocks, air_pockets, solid_blocks):
-
-    global changeCountWater
-    global changeCountAir
-    global changeCountSolid
-
-    chunk = None
-    try:
-        chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
-    except:
-        print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
-
-    if chunk:
-        replChunk = False
-        if replRegion:
-            try:
-                replChunk = anvil.Chunk.from_region(replRegion, chunkX, chunkZ)
-            except:
-                print(f'Could not create replacement chunk for {chunkX}, {chunkZ}.')
-
-        # print(replRegion, replChunk)
-
-        # Init
-        stateArray = np.zeros((16, 256, 16), dtype=int)
-        x = 0
-        y = 0
-        z = 0
-
-        # TODO position that is altered but shouldnt be
-        # (230, 31, 164)
-        # (228, 31, 167)
-
-        #  For debugging : block position
-        # if x == 13 and y == 50 and z == 10:
-        # Check how the chunk should be modified and save it in the stateArray
-        for block in chunk.stream_chunk():
-            if stateArray[x, y, z] == UNCHECKED:
-                if water_blocks == 1 and checkWaterBlocks(chunk, block, x, y, z):
-                    stateArray[x, y, z] = WATERBLOCK
-                    changeCountWater += 1
-                elif air_pockets == 1 and checkAirPockets(chunk, block, x, y, z):
-                    if solid_blocks == 1:
-                        stateArray[x, y, z] = AIRPOCKET
-                    else:
-                        stateArray[x, y, z] = AIRPOCKET_STONE
-                    changeCountAir += 1
-                elif solid_blocks == 1 and checkSolidArea(chunk, block, x, y, z):
-                    stateArray[x, y, z] = SOLIDAREA
-                    changeCountSolid += 1
-                else:
-                    stateArray[x, y, z] = UNCHANGED
-
-            if z == 15 and x == 15:
-                y += 1
-            if x == 15:
-                z = (z + 1) % 16
-            x = (x + 1) % 16
-
-        # Reset
-        newChunk = 0
-        x = 0
-        y = 0
-        z = 0
-
-        # Create `Block` objects that are used to set blocks
-        stone = anvil.Block('minecraft', 'stone')
-        water = anvil.Block('minecraft', 'water')
-        diamond_block = anvil.Block('minecraft', 'diamond_block')
-        gold_block = anvil.Block('minecraft', 'gold_block')
-
-        # Iterate all blocks and select write the new block to the newChunk
-        for block in chunk.stream_chunk():
-            b = block
-
-            # TODO if air block and not replacement igrnore?
-
-            xyz = stateArray[x, y, z]
-            if xyz == WATERBLOCK:
-                b = water
-                print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
-                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-            elif xyz == AIRPOCKET:
-                b = stone
-                if replChunk:
-                    newBlock = replChunk.get_block(x, y, z)
-                    if is_solid(newBlock.id):
-                        b = newBlock
-                print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
-                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-            elif xyz == AIRPOCKET_STONE:
-                b = gold_block
-                print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
-                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-            elif xyz == SOLIDAREA:
-                b = stone
-                if replChunk:
-                    newBlock = replChunk.get_block(x, y, z)
-                    if is_solid(newBlock.id):
-                        # b = newBlock
-                        # TODO debug version
-                        b = diamond_block
-            elif xyz == UNCHECKED:
-                print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
-                #print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-            elif xyz != UNCHANGED:
-                print(f'Found unidentified Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}) with {stateArray[x, y, z]}, this should not happen')
-                #print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-
-            try:
-                newChunk = newRegion.set_block(b, newRegion.x * 512 + chunkX * 16 + x, y, newRegion.z * 512 + chunkZ * 16 + z)
-            except:
-                print(f'could not set Block ({x},{y},{z})')
-
-            if z == 15 and x == 15:
-                y += 1
-            if x == 15:
-                z = (z + 1) % 16
-            x = (x + 1) % 16
-
-        newChunk.set_data(chunk.data)
 
 ###################################################################################################
 
@@ -440,9 +437,10 @@ def copyRegion(meta_info, filename):
     # for chunkX in range(13, 15):
 
         for chunkZ in range(max_chunkZ):
-        # for chunkZ in range(9, 11):
+        # for chunkZ in range(7, 11):
 
-            copyChunkOld(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
+            # copyChunkOld(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
+            copyChunk(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
 
             meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
 
@@ -483,7 +481,7 @@ def run(meta_info):
     meta_info.text_queue.put("\n.. starting\n")
     t1 = gmtime()
     meta_info.text_queue.put(strftime("%Y-%m-%d %H:%M:%S\n", t1))
-    # ms = int(round(time.time() * 1000))
+    ms = int(round(time.time() * 1000))
 
     # Get all files in the directory
     filelist = os.listdir(meta_info.source_dir.get())
@@ -518,8 +516,8 @@ def run(meta_info):
     meta_info.text_queue.put("Total runtime: ")
     meta_info.text_queue.put(datetime.timedelta(seconds=time.mktime(t2)-time.mktime(t1)))
 
-    # ms2 = int(round(time.time() * 1000))
-    # print(ms2 - ms)
+    ms2 = int(round(time.time() * 1000))
+    print(f"Total time elapsed: {ms2 - ms}")
 
     meta_info.finished = True
 
