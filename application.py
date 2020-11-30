@@ -12,7 +12,6 @@ import os
 
 # own imports
 from modifier import run
-from modifier import runloop
 from meta_information import MetaInformation
 
 PAD_X = 20
@@ -45,7 +44,6 @@ class MainApp():
 
         self.meta_info.finished = False
         self.new_thread = threading.Thread(
-            # target=runloop,
             target=run,
             kwargs={'meta_info':self.meta_info})
         self.new_thread.start()
