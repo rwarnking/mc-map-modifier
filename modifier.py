@@ -9,7 +9,6 @@ import numpy as np
 
 # Utilities
 from math import floor
-from collections import deque
 
 # TODO
 import time
@@ -242,24 +241,24 @@ def check_neighbours_validator2(state_array, x, y, z, validator, amount = 1):
 #                                 blocks.put(j)
 #                                 blocks.put(k)
 
-def check_neighbours_validator_save(queue, state_array, x, y, z, validator, limit = 1, amount = 1):
+def check_neighbours_validator_2(state_array, x, y, z, validator, limit = 1, amount = 1):
     if (x <= 0 or y <= 0 or z <= 0
         or x >= 15 or y >= 255 or z >= 15):
         return False
+
+    neighbour = True
 
     for i in range(x - amount, x + amount + 1):
         for j in range(y - amount, y + amount + 1):
             for k in range(z - amount, z + amount + 1):
                 if not (x == i and y == j and z == k):
                     if validator(state_array[i, j, k]):
-                        queue.append([i, j, k])
-                        # queue.append(i)
-                        # queue.append(j)
-                        # queue.append(k)
-                    if len(queue) > limit:
-                    # if len(queue) / 3 > limit:
-                        return False
-    return True
+                        if neighbour == True:
+                            neighbour = [i, j, k]
+                        else:
+                            return False
+
+    return neighbour
 
 def check_water_blocks(wp_size, state_array, x, y, z):
     if state_array[x, y, z] == G_SOLID:
@@ -268,24 +267,11 @@ def check_water_blocks(wp_size, state_array, x, y, z):
         # TODO this is kinda stupid because for every block the 2-case applies, the test is run
         # instead mark all blocks that are processed here
         elif wp_size == 2:
-            q = deque()
-            res = check_neighbours_validator_save(q, state_array, x, y, z, lambda s: s != G_WATER)
-            # elif len(q) > 3:
-            if len(q) > 1 or not res:
-                return False
-            # return len(q) == 0 and res
-            elif len(q) == 0:
+            res = check_neighbours_validator_2(state_array, x, y, z, lambda s: s != G_WATER)
+            if isinstance(res, bool):
                 return res
-            x2, y2, z2 = q.popleft()
-
-            # x2 = q.popleft()
-            # y2 = q.popleft()
-            # z2 = q.popleft()
-
-            q2 = deque()
-            res = check_neighbours_validator_save(q2, state_array, x2, y2, z2, lambda s: s != G_WATER)
-            # return (len(q2) / 3 == 1) and res
-            return (len(q2) == 1) and res
+            res = check_neighbours_validator_2(state_array, res[0], res[1], res[2], lambda s: s != G_WATER)
+            return res != False
         else:
             return check_neighbours_validator2(state_array, x, y, z, lambda s: s != G_WATER)
     return False
