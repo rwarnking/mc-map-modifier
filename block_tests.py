@@ -14,13 +14,10 @@ transparent_blocks = [
     'air',
     'cave_air',
     # all glass types
-    'glass',
-    'stained_glass',
-    'glass_pane',
-    'stained_glass_pane',
-    # all leaves
-    'leaves',
-    'leaves2',
+    # 'glass',
+    # 'stained_glass',
+    # 'glass_pane',
+    # 'stained_glass_pane',
     # all slabs
     # 'stone_slab',
     # 'stone_slab2',
@@ -35,7 +32,8 @@ transparent_blocks = [
 solid_blocks = [
     'stone',
     'dirt',
-    'wood'
+    'grass',
+    'cobblestone'
 ]
 
 def is_air(block_id):
@@ -44,8 +42,13 @@ def is_air(block_id):
 def is_water(block_id):
     return block_id in water_blocks
 
-# def is_glass(block_id):
-#     return 'glass' in block_id
+###################################################################################################
+
+def is_glass(block_id):
+    return 'glass' in block_id
+
+def is_leave(block_id):
+    return 'leaves' in block_id
 
 def is_fence(block_id):
     return 'fence' in block_id
@@ -55,7 +58,15 @@ def is_slab(block_id):
     return 'slab' in block_id
 
 def is_transparent(block_id):
-    return block_id in transparent_blocks or is_fence(block_id) or is_slab(block_id)
+    return block_id in transparent_blocks or is_leave(block_id) or is_glass(block_id) or is_fence(block_id) or is_slab(block_id)
+
+###################################################################################################
+
+def is_log(block_id):
+    return 'log' in block_id
+
+def is_plank(block_id):
+    return 'planks' in block_id
 
 def is_solid(block_id):
-    return block_id in solid_blocks
+    return block_id in solid_blocks or is_log(block_id) or is_plank(block_id)

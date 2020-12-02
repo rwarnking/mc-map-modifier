@@ -294,8 +294,7 @@ UNCHECKED = 0
 UNCHANGED = 1
 WATERBLOCK = 2
 AIRPOCKET = 3
-AIRPOCKET_STONE = 4
-SOLIDAREA = 5
+SOLIDAREA = 4
 
 G_AIR = 1
 G_WATER = 2
@@ -343,11 +342,7 @@ def identify(meta_info, chunk, state_array, state_array2, water_blocks, air_pock
             state_array2[x, y, z] = WATERBLOCK
             changeCountWater += 1
         elif air_pockets == 1 and check_air_pockets(state_array, x, y, z):
-            # TODO this check is redundant when the repl_chunk is only set if solid_blocks == 1
-            if solid_blocks == 1:
-                state_array2[x, y, z] = AIRPOCKET
-            else:
-                state_array2[x, y, z] = AIRPOCKET_STONE
+            state_array2[x, y, z] = AIRPOCKET
             changeCountAir += 1
         elif solid_blocks == 1 and check_solid_area(state_array, x, y, z):
             state_array2[x, y, z] = SOLIDAREA
@@ -372,18 +367,17 @@ def modify(state_array, chunk, replChunk, newRegion, chunkX, chunkZ):
     water = anvil.Block('minecraft', 'water')
     diamond_block = anvil.Block('minecraft', 'diamond_block')
     gold_block = anvil.Block('minecraft', 'gold_block')
+    blue_wool = anvil.Block('minecraft', 'blue_wool')
 
     # Iterate all blocks and select write the new block to the newChunk
     for block in chunk.stream_chunk():
         b = block
 
-        # TODO if air block and not replacement igrnore?
         xyz = state_array[x, y, z]
         if xyz == WATERBLOCK:
             b = water
             print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
             print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-        # TODO combine airpocket and airpocket_stone
         elif xyz == AIRPOCKET:
             b = gold_block
             if replChunk:
@@ -391,18 +385,15 @@ def modify(state_array, chunk, replChunk, newRegion, chunkX, chunkZ):
                 # TODO expand is_solid list
                 if is_solid(newBlock.id):
                     b = newBlock
+                    b = blue_wool
             print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
             print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-        elif xyz == AIRPOCKET_STONE:
-            b = gold_block
-            print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
-            print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
         elif xyz == SOLIDAREA:
-            # Replace the block if it is solid but use the original when it is not
             if replChunk:
                 newBlock = replChunk.get_block(x, y, z)
+                # Replace the block if it is solid but use the original when it is not
                 if is_solid(newBlock.id):
-                    # b = newBlock
+                    b = newBlock
                     # TODO debug version
                     b = diamond_block
         elif xyz == UNCHECKED:
@@ -444,7 +435,6 @@ def copyChunk(meta_info, newRegion, region, replRegion, chunkX, chunkZ):
     if chunk:
 
         # ms = int(round(time.time() * 1000))
-
         classified = np.zeros((16, 256, 16), dtype=int)
         classify(chunk, classified)
 
@@ -507,12 +497,15 @@ def copyRegion(meta_info, filename):
     meta_info.chunk_count_max = max_chunkX * max_chunkZ
     meta_info.estimated_time = meta_info.chunk_count_max * meta_info.file_count_max
 
-    # for chunkX in range(max_chunkX):
-    for chunkX in range(10, 12):
+    # region_array = np.zeros((16*32, 256, 16*32), dtype=int)
+
+
+    for chunkX in range(max_chunkX):
+    # for chunkX in range(10, 12):
 
         ms = int(round(time.time() * 1000))
-        # for chunkZ in range(max_chunkZ):
-        for chunkZ in range(11, 16):
+        for chunkZ in range(max_chunkZ):
+        # for chunkZ in range(11, 16):
             # copyChunkOld(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
             copyChunk(meta_info, newRegion, region, replRegion, chunkX, chunkZ)
             meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
