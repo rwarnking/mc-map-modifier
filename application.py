@@ -94,10 +94,6 @@ class MainApp():
             self.file_label.config(text=f"Finished file {f_count} of {f_count_max} files.")
             window.after(50, lambda: self.listen_for_result(window))
 
-    # 17
-    # 12
-    #
-
     ###############################################################################################
     # Initialisation functions
     ###############################################################################################
@@ -134,10 +130,16 @@ class MainApp():
 
         # TODO give option to select block amount
         # Label(master, text="First Name").grid(row=0)
-        # Label(master, text="Last Name").grid(row=1)
-        Entry(window, width=5).grid(row=6, sticky=E, padx = (0, 20))
-        Entry(window, width=5).grid(row=7, sticky=E, padx = (0, 20))
-        Entry(window, width=5).grid(row=8, sticky=E, padx = (0, 20))
+
+        vcmd = (window.register(lambda P: str.isdigit(P)))
+        e_pad_x = (0, 20)
+        l_pad_x = (0, 20 + 2 * 10)
+        Label(window, text="Num blocks: ").grid(row=6, sticky=E, padx = l_pad_x)
+        Entry(window, textvariable=self.meta_info.wpocket_size, width=2, validate='all', validatecommand=(vcmd, '%P')).grid(row=6, sticky=E, padx=e_pad_x)
+        Label(window, text="Num blocks: ").grid(row=7, sticky=E, padx = l_pad_x)
+        Entry(window, textvariable=self.meta_info.apocket_size, width=2, validate='all', validatecommand=(vcmd, '%P')).grid(row=7, sticky=E, padx=e_pad_x)
+        Label(window, text="Neighbourhood: ").grid(row=8, sticky=E, padx = l_pad_x)
+        Entry(window, textvariable=self.meta_info.repl_area, width=2, validate='all', validatecommand=(vcmd, '%P')).grid(row=8, sticky=E, padx=e_pad_x)
 
     def init_progressindicator(self, window):
         # Update to get the correct width for the progressbar

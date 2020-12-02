@@ -14,6 +14,13 @@ class MetaInformation():
         self.air_pockets = IntVar()
         self.repl_blocks = IntVar()
 
+        self.wpocket_size = StringVar()
+        self.wpocket_size.set("1")
+        self.apocket_size = StringVar()
+        self.apocket_size.set("1")
+        self.repl_area = StringVar()
+        self.repl_area.set("1")
+
         self.text_queue = queue.Queue()
         self.elapsed_time = 0
         self.estimated_time = 0

@@ -9,7 +9,7 @@ import numpy as np
 
 # Utilities
 from math import floor
-import queue
+from collections import deque
 
 # TODO
 import time
@@ -22,6 +22,9 @@ from tkinter import messagebox
 
 # Own imports
 from block_tests import is_air, is_water, is_transparent, is_solid
+
+# TODO
+# from scipy.ndimage import label
 
 ###################################################################################################
 # VERSION 1.0
@@ -209,9 +212,82 @@ def check_neighbours_validator2(state_array, x, y, z, validator, amount = 1):
                        return False
     return True
 
-def check_water_blocks(state_array, x, y, z):
+# def check_water_blocks(state_array, x, y, z, amount = 1):
+#     if (x <= 0 or y <= 0 or z <= 0
+#         or x >= 15 or y >= 255 or z >= 15):
+#         return False
+
+#     if state_array[x, y, z] == G_SOLID:
+#         blocks = queue.Queue()
+#         save = queue.Queue()
+#         blocks.put(x)
+#         blocks.put(y)
+#         blocks.put(z)
+#         save.put(x)
+#         save.put(y)
+#         save.put(z)
+
+#         for i in range(2):
+#             x1 = blocks.get(0)
+#             y1 = blocks.get(0)
+#             z1 = blocks.get(0)
+#             for i in range(x1 - amount, x1 + amount + 1):
+#                 for j in range(y1 - amount, y1 + amount + 1):
+#                     for k in range(z1 - amount, z1 + amount + 1):
+#                         if len(blocks) > 2:
+#                             return false;
+#                         if not (x1 == i and y1 == j and z1 == k):
+#                             if state_array[i, j, k] == G_SOLID:
+#                                 blocks.put(i)
+#                                 blocks.put(j)
+#                                 blocks.put(k)
+
+def check_neighbours_validator_save(queue, state_array, x, y, z, validator, limit = 1, amount = 1):
+    if (x <= 0 or y <= 0 or z <= 0
+        or x >= 15 or y >= 255 or z >= 15):
+        return False
+
+    for i in range(x - amount, x + amount + 1):
+        for j in range(y - amount, y + amount + 1):
+            for k in range(z - amount, z + amount + 1):
+                if not (x == i and y == j and z == k):
+                    if validator(state_array[i, j, k]):
+                        queue.append([i, j, k])
+                        # queue.append(i)
+                        # queue.append(j)
+                        # queue.append(k)
+                    if len(queue) > limit:
+                    # if len(queue) / 3 > limit:
+                        return False
+    return True
+
+def check_water_blocks(wp_size, state_array, x, y, z):
     if state_array[x, y, z] == G_SOLID:
-        return check_neighbours_validator2(state_array, x, y, z, lambda s: s != G_WATER)
+        if wp_size == 1:
+            return check_neighbours_validator2(state_array, x, y, z, lambda s: s != G_WATER)
+        # TODO this is kinda stupid because for every block the 2-case applies, the test is run
+        # instead mark all blocks that are processed here
+        elif wp_size == 2:
+            q = deque()
+            res = check_neighbours_validator_save(q, state_array, x, y, z, lambda s: s != G_WATER)
+            # elif len(q) > 3:
+            if len(q) > 1 or not res:
+                return False
+            # return len(q) == 0 and res
+            elif len(q) == 0:
+                return res
+            x2, y2, z2 = q.popleft()
+
+            # x2 = q.popleft()
+            # y2 = q.popleft()
+            # z2 = q.popleft()
+
+            q2 = deque()
+            res = check_neighbours_validator_save(q2, state_array, x2, y2, z2, lambda s: s != G_WATER)
+            # return (len(q2) / 3 == 1) and res
+            return (len(q2) == 1) and res
+        else:
+            return check_neighbours_validator2(state_array, x, y, z, lambda s: s != G_WATER)
     return False
 
 def check_air_pockets(state_array, x, y, z):
@@ -264,19 +340,24 @@ def classify(chunk, state_array):
             z = (z + 1) % 16
         x = (x + 1) % 16
 
-def identify(chunk, state_array, state_array2, water_blocks, air_pockets, solid_blocks):
+def identify(meta_info, chunk, state_array, state_array2, water_blocks, air_pockets, solid_blocks):
     global changeCountWater
     global changeCountAir
     global changeCountSolid
+
+    wp_size = int(meta_info.wpocket_size.get())
+    # print(wp_size)
+    # print(wp_size == 2)
 
     x = 0
     y = 0
     z = 0
     for block in chunk.stream_chunk():
-        if water_blocks == 1 and check_water_blocks(state_array, x, y, z):
+        if water_blocks == 1 and check_water_blocks(wp_size, state_array, x, y, z):
             state_array2[x, y, z] = WATERBLOCK
             changeCountWater += 1
         elif air_pockets == 1 and check_air_pockets(state_array, x, y, z):
+            # TODO this check is redundant when the repl_chunk is only set if solid_blocks == 1
             if solid_blocks == 1:
                 state_array2[x, y, z] = AIRPOCKET
             else:
@@ -318,12 +399,12 @@ def modify(state_array, chunk, replChunk, newRegion, chunkX, chunkZ):
             print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
         # TODO combine airpocket and airpocket_stone
         elif xyz == AIRPOCKET:
+            b = gold_block
             if replChunk:
                 newBlock = replChunk.get_block(x, y, z)
+                # TODO expand is_solid list
                 if is_solid(newBlock.id):
                     b = newBlock
-            else:
-                b = gold_block
             print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
             print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
         elif xyz == AIRPOCKET_STONE:
@@ -331,7 +412,7 @@ def modify(state_array, chunk, replChunk, newRegion, chunkX, chunkZ):
             print(f'Found AIRPOCKET_STONE Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
             print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
         elif xyz == SOLIDAREA:
-            b = stone
+            # Replace the block if it is solid but use the original when it is not
             if replChunk:
                 newBlock = replChunk.get_block(x, y, z)
                 if is_solid(newBlock.id):
@@ -358,9 +439,11 @@ def modify(state_array, chunk, replChunk, newRegion, chunkX, chunkZ):
 
     newChunk.set_data(chunk.data)
 
-def copyChunk(newRegion, region, replRegion,
-    chunkX, chunkZ,
-    water_blocks, air_pockets, solid_blocks):
+def copyChunk(meta_info, newRegion, region, replRegion, chunkX, chunkZ):
+
+    water_blocks = meta_info.water_blocks.get()
+    air_pockets = meta_info.air_pockets.get()
+    solid_blocks = meta_info.repl_blocks.get()
 
     global changeCountWater
     global changeCountAir
@@ -384,7 +467,7 @@ def copyChunk(newRegion, region, replRegion,
         # ms = int(round(time.time() * 1000))
 
         identified = np.zeros((16, 256, 16), dtype=int)
-        identify(chunk, classified, identified, water_blocks, air_pockets, solid_blocks)
+        identify(meta_info, chunk, classified, identified, water_blocks, air_pockets, solid_blocks)
 
         # ms2 = int(round(time.time() * 1000))
         # print(ms2 - ms)
@@ -407,10 +490,8 @@ def copyChunk(newRegion, region, replRegion,
 
 def copyRegion(meta_info, filename):
 
-    src_dir = meta_info.source_dir.get()
-    target_dir = meta_info.target_dir.get()
-    repl_dir = meta_info.replacement_dir.get()
-
+    # TODO how should this be acessed
+    # TODO i tested it, the get() is heavy on performance and should be avoided by any cost
     water_blocks = meta_info.water_blocks.get()
     air_pockets = meta_info.air_pockets.get()
     solid_blocks = meta_info.repl_blocks.get()
@@ -421,11 +502,13 @@ def copyRegion(meta_info, filename):
 
     # Create a new region with the `EmptyRegion` class at region coords
     newRegion = anvil.EmptyRegion(rX, rZ)
+    src_dir = meta_info.source_dir.get()
     region = anvil.Region.from_file(src_dir + "/" + filename)
 
     replRegion = False
     if solid_blocks:
         try:
+            repl_dir = meta_info.replacement_dir.get()
             replRegion = anvil.Region.from_file(repl_dir + "/" + filename)
         except:
             print(f'Could not create replacement region for {filename}.')
@@ -438,14 +521,14 @@ def copyRegion(meta_info, filename):
     meta_info.chunk_count_max = max_chunkX * max_chunkZ
     meta_info.estimated_time = meta_info.chunk_count_max * meta_info.file_count_max
 
-    for chunkX in range(max_chunkX):
-    # for chunkX in range(13, 15):
+    # for chunkX in range(max_chunkX):
+    for chunkX in range(10, 12):
 
         ms = int(round(time.time() * 1000))
-        for chunkZ in range(max_chunkZ):
-        # for chunkZ in range(7, 11):
+        # for chunkZ in range(max_chunkZ):
+        for chunkZ in range(11, 16):
             # copyChunkOld(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
-            copyChunk(newRegion, region, replRegion, chunkX, chunkZ, water_blocks, air_pockets, solid_blocks)
+            copyChunk(meta_info, newRegion, region, replRegion, chunkX, chunkZ)
             meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
 
         ms2 = int(round(time.time() * 1000))
@@ -465,6 +548,7 @@ def copyRegion(meta_info, filename):
         meta_info.text_queue.put(f'Changed {changeCountSolid} solid blocks to replacement solid blocks.\n')
 
     # Save to a file
+    target_dir = meta_info.target_dir.get()
     newRegion.save(target_dir + "/" + filename)
 
 ###################################################################################################
