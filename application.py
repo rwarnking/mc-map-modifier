@@ -11,7 +11,7 @@ import threading
 import os
 
 # own imports
-from modifier import run
+from modifier import Modifier
 from meta_information import MetaInformation
 
 PAD_X = 20
@@ -42,10 +42,9 @@ class MainApp():
             window.after(50, lambda: self.listen_for_result(window))
             return
 
+        m = Modifier(self.meta_info)
         self.meta_info.finished = False
-        self.new_thread = threading.Thread(
-            target=run,
-            kwargs={'meta_info':self.meta_info})
+        self.new_thread = threading.Thread(target=m.run)
         self.new_thread.start()
         window.after(50, lambda: self.listen_for_result(window))
 
