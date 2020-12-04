@@ -70,3 +70,21 @@ def is_plank(block_id):
 
 def is_solid(block_id):
     return block_id in solid_blocks or is_log(block_id) or is_plank(block_id)
+
+###################################################################################################
+
+# TODO have this only once
+G_AIR = 1
+G_WATER = 2
+G_SOLID = 3
+G_TRANSPARENT = 4
+
+def get_type(block_id):
+    if is_air(block_id):
+        return G_AIR
+    elif is_water(block_id):
+        return G_WATER
+    elif is_transparent(block_id):
+        return G_TRANSPARENT
+    else:
+        return G_SOLID
