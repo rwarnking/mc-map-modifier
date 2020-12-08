@@ -12,7 +12,7 @@ from contextlib import contextmanager, closing
 import numpy as np
 
 # Own imports
-from block_tests import get_type, get_repl_type # TODO
+from block_tests import get_type, get_repl_type, get_air_type, get_water_type # TODO
 
 class ClassifierMPMT:
 
@@ -38,22 +38,28 @@ class ClassifierMPMT:
         assert nparray.base is shared_array
         return nparray
 
-    def init_worker(self, shared_array_, region_):
+    def init_worker(self, air_array_shared_, water_array_shared_, repl_array_shared_, region_):
         '''Initialize worker for processing.
 
         Args:
             shared_array_: Object returned by init_shared
         '''
-        global shared_np_array
+        global air_array_shared
+        global water_array_shared
+        global repl_array_shared
         global region
 
-        shared_np_array = self.tonumpyarray(shared_array_)
+        air_array_shared = self.tonumpyarray(air_array_shared_)
+        water_array_shared = self.tonumpyarray(water_array_shared_)
+        repl_array_shared = self.tonumpyarray(repl_array_shared_)
         region = region_
 
     # TODO rename
     def worker_fun(self, ix):
         '''Function to be run inside each worker'''
-        shared_np_array.shape = (self.size_x, self.size_y, self.size_z)
+        air_array_shared.shape = (self.size_x, self.size_y, self.size_z)
+        water_array_shared.shape = (self.size_x, self.size_y, self.size_z)
+        repl_array_shared.shape = (self.size_x, self.size_y, self.size_z)
         chunkX, chunkZ = ix
 
         try:
@@ -72,7 +78,9 @@ class ClassifierMPMT:
         blocks_chunk_z = 16
         for block in chunk.stream_chunk():
             # shared_np_array[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_type(block.id)
-            shared_np_array[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_repl_type(block.id)
+            air_array_shared[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_air_type(block.id)
+            water_array_shared[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_water_type(block.id)
+            repl_array_shared[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_repl_type(block.id)
 
             # TODO self.blocks_chunk_x
             if z == 15 and x == 15:
@@ -82,20 +90,26 @@ class ClassifierMPMT:
             x = (x + 1) % 16
 
     def classify_all_mp(self, region):
-        shared_array = self.init_shared(self.size_x * self.size_y * self.size_z)
+        air_array_shared = self.init_shared(self.size_x * self.size_y * self.size_z)
+        water_array_shared = self.init_shared(self.size_x * self.size_y * self.size_z)
+        repl_array_shared = self.init_shared(self.size_x * self.size_y * self.size_z)
 
         window_idxs = [(i, j) for i, j in
                     itertools.product(range(0, self.max_chunk_x),
                                         range(0, self.max_chunk_z))]
 
-        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (shared_array, region))) as pool:
+        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (air_array_shared, water_array_shared, repl_array_shared, region))) as pool:
             res = pool.map(self.worker_fun, window_idxs)
 
         pool.close()
         pool.join()
 
-        self.classified_region = self.tonumpyarray(shared_array)
-        self.classified_region.shape = (self.size_x, self.size_y, self.size_z)
+        self.classified_air_region = self.tonumpyarray(air_array_shared)
+        self.classified_air_region.shape = (self.size_x, self.size_y, self.size_z)
+        self.classified_water_region = self.tonumpyarray(water_array_shared)
+        self.classified_water_region.shape = (self.size_x, self.size_y, self.size_z)
+        self.classified_repl_region = self.tonumpyarray(repl_array_shared)
+        self.classified_repl_region.shape = (self.size_x, self.size_y, self.size_z)
 
 # https://stackoverflow.com/questions/3033952/threading-pool-similar-to-the-multiprocessing-pool
     def classify_all_mt(self, region):

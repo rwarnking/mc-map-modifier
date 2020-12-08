@@ -251,22 +251,22 @@ class Modifier():
             z_global = newRegion.z * 512 + z_region
 
             xyz = self.identifier.identified[x_region, y, z_region]
-            # if xyz == WATERBLOCK:
-            #     b = water
-            #     print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
-            #     print(f'GlobalPos: ({x_global}, {y}, {z_global})')
-            # elif xyz == AIRPOCKET:
-            #     b = gold_block
-            #     if replChunk:
-            #         newBlock = replChunk.get_block(x, y, z)
-            #         # TODO expand is_solid list
-            #         if is_solid(newBlock.id):
-            #             b = newBlock
-            #             b = blue_wool
-            #     print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
-            #     print(f'GlobalPos: ({x_global}, {y}, {z_global})')
-            # elif xyz == SOLIDAREA:
-            if xyz == SOLIDAREA:
+            if xyz == WATERBLOCK:
+                b = water
+                print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
+                print(f'GlobalPos: ({x_global}, {y}, {z_global})')
+            elif xyz == AIRPOCKET:
+                b = gold_block
+                # if replChunk:
+                #     newBlock = replChunk.get_block(x, y, z)
+                #     # TODO expand is_solid list
+                #     if is_solid(newBlock.id):
+                #         b = newBlock
+                #         b = blue_wool
+                print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
+                print(f'GlobalPos: ({x_global}, {y}, {z_global})')
+            elif xyz == SOLIDAREA:
+            # if xyz == SOLIDAREA:
                 if replChunk:
                     newBlock = replChunk.get_block(x, y, z)
                     # Replace the block if it is solid but use the original when it is not
@@ -529,14 +529,17 @@ class Modifier():
 
         classifier_mp_mt = ClassifierMPMT()
         classifier_mp_mt.classify_all_mp(region)
-        self.classified_region = classifier_mp_mt.classified_region
+        # TODO does the modifier need this?
+        self.classified_air_region = classifier_mp_mt.classified_air_region
+        self.classified_water_region = classifier_mp_mt.classified_water_region
+        self.classified_repl_region = classifier_mp_mt.classified_repl_region
 
         ms2 = int(round(time.time() * 1000))
         print(f"Classifier time: {ms2 - ms}")
 
         self.identifier = Identifier(self.meta_info, True)
         # TODO names
-        self.changeCountWater, self.changeCountAir, self.changeCountRepl = self.identifier.identify_label(self.classified_region)
+        self.changeCountWater, self.changeCountAir, self.changeCountRepl = self.identifier.identify_label(self.classified_air_region, self.classified_water_region, self.classified_repl_region)
 
         ms3 = int(round(time.time() * 1000))
         print(f"Identifier time: {ms3 - ms2}")

@@ -258,6 +258,8 @@ def get_repl_type(block_id):
 # dann checke wie groß eine region ist
 # wenn kleiner als schwellwert, dann gehe alle blocks durch - wenn keiner davon ein transparenter
 # block ist, handelt es sich um ein pocket
+
+# TODO addö water
 def get_air_type(block_id):
     if is_air(block_id):
         return G_AIR
@@ -271,3 +273,8 @@ def get_air_type(block_id):
 # markiere water als background
 # checke alle labelregionen
 # wenn kleiner schwellwert, dann muss es sich um ein pocket handeln?
+def get_water_type(block_id):
+    if is_water(block_id):
+        return G_BACKGROUND
+    else:
+        return G_SOLID

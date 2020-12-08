@@ -139,7 +139,7 @@ class Identifier:
 
         return [self.changeCountWater, self.changeCountAir, self.changeCountRepl]
 
-    def identify_label(self, classified_region):
+    def identify_label(self, classified_air_region, classified_water_region, classified_repl_region):
         #         subset1=np.array([
         #     [[0, 0, 0],
         #     [0, 0, 0],
@@ -186,8 +186,15 @@ class Identifier:
             [1, 1, 1],
             [1, 1, 1]]])
 
+        # times
+        # classify: 77517
+        # identify: 175945
+        # modify: 560962
+        # save: 180618
+        # total: 996793
+
         # TODO
-        # from scipy.ndimage import label as label2
+        from scipy.ndimage import label as label2
         # arr, num = label2(classified_region, str_3D)
 
         # print(f"label2 num: {num}")
@@ -196,8 +203,13 @@ class Identifier:
 
         # np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
         # np.savetxt('data.csv', self.classified_region[1], fmt='%i', delimiter=',')
-        arr, num = label(classified_region, connectivity=2, return_num=True, background=0) # TODO g_background
-        print(num)
+        # arr1, num1 = label(classified_air_region, connectivity=2, return_num=True, background=0) # TODO g_background
+        arr1, num1 = label2(classified_air_region, str_3D)
+        arr2, num2 = label(classified_water_region, connectivity=2, return_num=True, background=0) # TODO g_background
+        arr3, num3 = label(classified_repl_region, connectivity=2, return_num=True, background=0) # TODO g_background
+        print(num1)
+        print(num2)
+        print(num3)
 
         self.blocks_chunk_x = 16
         self.blocks_chunk_y = 256
@@ -216,19 +228,45 @@ class Identifier:
         # num: 49
         # 1: 49193926
         # 3: 17914938
-        for idx in range(0, 10):
-            result = np.nonzero(classified_region == idx)
-            print(f"Length of classified_region == {idx}")
-            print(len(result[0]))
+        # for idx in range(0, 10):
+        #     result = np.nonzero(classified_region == idx)
+        #     print(f"Length of classified_region == {idx}")
+        #     print(len(result[0]))
 
-        for idx in range(1, num):
-            result = np.nonzero(arr == idx)
+        # TODO parallelise
 
-            x = result[0][0]
-            y = result[1][0]
-            z = result[2][0]
+        # TODO check for amount num1 after waterfix -> last label count = 503
+        for idx in range(1, num1):
+            result = np.nonzero(arr1 == idx)
+            lenght = len(result[0])
 
-            block_class = classified_region[x, y, z]
+            if lenght <= 1:
+                self.fill_array(result, AIRPOCKET)
+                changeCountAir += lenght
+
+        # last label count = 9
+
+        # TODO the problem is, that the blocks are first replaced with water but
+        # afterwards replaced again due to the relacementtest
+        # for smaller sizes this should be fixed by the tickness test, but for bigger pockets
+        # it is recommended to first do the replace and afterwards do the waterblocks
+        for idx in range(1, num2):
+            result = np.nonzero(arr2 == idx)
+            lenght = len(result[0])
+
+            if lenght <= 2:
+                self.fill_array(result, WATERBLOCK)
+                changeCountWater += lenght
+
+        # last label count = 56
+        for idx in range(1, num3):
+            result = np.nonzero(arr3 == idx)
+
+            # x = result[0][0]
+            # y = result[1][0]
+            # z = result[2][0]
+
+            #block_class = classified_repl_region[x, y, z]
             lenght = len(result[0])
 
             # if self.air_pockets == 1 and lenght <= air_p_size and block_class == G_AIR:
@@ -244,16 +282,16 @@ class Identifier:
             self.fill_array(result, SOLIDAREA)
             changeCountRepl += lenght
 
-            if idx % 20 == 0:
-                print(idx)
+            # if idx % 20 == 0:
+            #     print(idx)
 
         # 17914937
-        print(changeCountRepl)
+        # print(changeCountRepl)
 
-        for idx in range(4, 5):
-            result = np.nonzero(self.identified == idx)
-            print(f"Length of self.identified == {idx}")
-            print(len(result[0]))
+        # for idx in range(4, 5):
+        #     result = np.nonzero(self.identified == idx)
+        #     print(f"Length of self.identified == {idx}")
+        #     print(len(result[0]))
 
         return [changeCountWater, changeCountAir, changeCountRepl]
 
