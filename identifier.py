@@ -113,6 +113,7 @@ class Identifier:
             self.offset_x = 16 * chunk_x
             self.offset_z = 16 * chunk_z
 
+        # TODO this is a stupid way to loop since neither the block nor the chunk are used
         for block in chunk.stream_chunk():
             if self.water_blocks == 1 and self.check_water_blocks(self.wp_size, states, x + self.offset_x, y, z + self.offset_z):
                 self.identified[x, y, z] = WATERBLOCK
@@ -123,8 +124,11 @@ class Identifier:
             elif self.repl_blocks == 1 and self.check_solid_area(states, x + self.offset_x, y, z + self.offset_z):
                 self.identified[x, y, z] = SOLIDAREA
                 self.changeCountRepl += 1
+            elif states[x + self.offset_x, y, z + self.offset_z] > 0:
+                self.identified[x, y, z] = UNCHANGED
             else:
                 self.identified[x, y, z] = UNCHANGED
+                print("Error in identifier.")
 
             # TODO
             if z == 15 and x == 15:
@@ -134,3 +138,135 @@ class Identifier:
             x = (x + 1) % 16
 
         return [self.changeCountWater, self.changeCountAir, self.changeCountRepl]
+
+    def identify_label(self, classified_region):
+        #         subset1=np.array([
+        #     [[0, 0, 0],
+        #     [0, 0, 0],
+        #     [0, 0, 0]],
+
+        #     [[0, 0, 0],
+        #     [0, 1, 0],
+        #     [0, 0, 0]],
+
+        #     [[0, 0, 0],
+        #     [0, 0, 0],
+        #     [0, 0, 0]],
+
+        #     [[0, 1, 0],
+        #     [1, 1, 1],
+        #     [0, 1, 0]],
+
+        #     [[0, 0, 0],
+        #     [0, 0, 0],
+        #     [0, 0, 0]]
+        #     ])
+
+        # subset2=np.array([[[1, 1, 1],
+        #     [1, 1, 1],
+        #     [1, 1, 1]],
+
+        #     [[1, 1, 1],
+        #     [1, 2, 1],
+        #     [1, 1, 1]],
+
+        #     [[1, 1, 1],
+        #     [1, 1, 1],
+        #     [1, 1, 1]]])
+
+        str_3D=np.array([[[1, 1, 1],
+            [1, 1, 1],
+            [1, 1, 1]],
+
+            [[1, 1, 1],
+            [1, 1, 1],
+            [1, 1, 1]],
+
+            [[1, 1, 1],
+            [1, 1, 1],
+            [1, 1, 1]]])
+
+        # TODO
+        # from scipy.ndimage import label as label2
+        # arr, num = label2(classified_region, str_3D)
+
+        # print(f"label2 num: {num}")
+
+        from skimage.measure import label
+
+        # np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
+        # np.savetxt('data.csv', self.classified_region[1], fmt='%i', delimiter=',')
+        arr, num = label(classified_region, connectivity=2, return_num=True, background=0) # TODO g_background
+        print(num)
+
+        self.blocks_chunk_x = 16
+        self.blocks_chunk_y = 256
+        self.blocks_chunk_z = 16
+        self.max_chunk_x = 32
+        self.max_chunk_z = 32
+        self.identified = np.zeros((self.blocks_chunk_x * self.max_chunk_x, self.blocks_chunk_y, self.blocks_chunk_z * self.max_chunk_z), dtype=int)
+
+        changeCountWater = 0
+        changeCountAir = 0
+        changeCountRepl = 0
+
+        air_p_size = 1
+        water_p_size = 1
+
+        # num: 49
+        # 1: 49193926
+        # 3: 17914938
+        for idx in range(0, 10):
+            result = np.nonzero(classified_region == idx)
+            print(f"Length of classified_region == {idx}")
+            print(len(result[0]))
+
+        for idx in range(1, num):
+            result = np.nonzero(arr == idx)
+
+            x = result[0][0]
+            y = result[1][0]
+            z = result[2][0]
+
+            block_class = classified_region[x, y, z]
+            lenght = len(result[0])
+
+            # if self.air_pockets == 1 and lenght <= air_p_size and block_class == G_AIR:
+            #     self.fill_array(result, AIRPOCKET)
+            #     changeCountAir += lenght
+            # elif self.water_blocks == 1 and lenght <= water_p_size and block_class == G_SOLID:
+            #     # TODO water check is missing
+            #     # TODO water could be below and air above
+            #     self.fill_array(result, WATERBLOCK)
+            #     changeCountWater += lenght
+            # # TODO bordercheck needed here
+            # if self.repl_blocks == 1 and block_class == G_SOLID: # TODO
+            self.fill_array(result, SOLIDAREA)
+            changeCountRepl += lenght
+
+            if idx % 20 == 0:
+                print(idx)
+
+        # 17914937
+        print(changeCountRepl)
+
+        for idx in range(4, 5):
+            result = np.nonzero(self.identified == idx)
+            print(f"Length of self.identified == {idx}")
+            print(len(result[0]))
+
+        return [changeCountWater, changeCountAir, changeCountRepl]
+
+        # print(num)
+        # np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
+
+    # TODO is there a numpy function for this?
+    def fill_array(self, result, value):
+        self.identified[result[0], result[1], result[2]] = value
+
+        # list_of_indices = list(zip(result[0], result[1], result[2]))
+
+        # for xyz in list_of_indices:
+        #     x2, y2, z2 = xyz
+        #     self.identified[x2, y2, z2] = value
+

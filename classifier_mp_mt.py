@@ -12,7 +12,7 @@ from contextlib import contextmanager, closing
 import numpy as np
 
 # Own imports
-from block_tests import get_type
+from block_tests import get_type, get_repl_type # TODO
 
 class ClassifierMPMT:
 
@@ -50,6 +50,7 @@ class ClassifierMPMT:
         shared_np_array = self.tonumpyarray(shared_array_)
         region = region_
 
+    # TODO rename
     def worker_fun(self, ix):
         '''Function to be run inside each worker'''
         shared_np_array.shape = (self.size_x, self.size_y, self.size_z)
@@ -70,7 +71,8 @@ class ClassifierMPMT:
         blocks_chunk_x = 16
         blocks_chunk_z = 16
         for block in chunk.stream_chunk():
-            shared_np_array[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_type(block.id)
+            # shared_np_array[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_type(block.id)
+            shared_np_array[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_repl_type(block.id)
 
             # TODO self.blocks_chunk_x
             if z == 15 and x == 15:

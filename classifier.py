@@ -48,11 +48,14 @@ class Classifier:
         if not self.all:
             print("Error in classifier.")
 
+        max_chunk_x = 32
+        max_chunk_z = 32
+
         chunk = None
-        # for chunkX in range(max_chunkX):
-        for chunk_x in range(10, 12):
-            # for chunkZ in range(max_chunkZ):
-            for chunk_z in range(11, 16):
+        for chunk_x in range(max_chunk_x):
+        # for chunk_x in range(10, 12):
+            for chunk_z in range(max_chunk_z):
+            # for chunk_z in range(11, 16):
 
                 try:
                     chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
