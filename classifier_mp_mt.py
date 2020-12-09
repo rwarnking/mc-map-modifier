@@ -50,9 +50,9 @@ class ClassifierMPMT:
     # TODO rename
     def worker_fun(self, ix):
         '''Function to be run inside each worker'''
-        air_array_shared.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
-        water_array_shared.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
-        repl_array_shared.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
+        air_array_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+        water_array_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+        repl_array_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         chunk_x, chunk_z = ix
 
         try:
@@ -67,8 +67,8 @@ class ClassifierMPMT:
         x = 0
         y = 0
         z = 0
-        chunk_b_x = cfg.CHUNK_X
-        chunk_b_z = cfg.CHUNK_Z
+        chunk_b_x = cfg.CHUNK_B_X
+        chunk_b_z = cfg.CHUNK_B_Z
         for block in chunk.stream_chunk():
             r_x = x + chunk_b_x * chunk_x
             r_z = z + chunk_b_z * chunk_z
@@ -85,13 +85,13 @@ class ClassifierMPMT:
 
     def classify_all_mp(self, region):
         # TODO calc once and dont do it again
-        air_array_shared = self.init_shared(cfg.REGION_TOTAL)
-        water_array_shared = self.init_shared(cfg.REGION_TOTAL)
-        repl_array_shared = self.init_shared(cfg.REGION_TOTAL)
+        air_array_shared = self.init_shared(cfg.REGION_B_TOTAL)
+        water_array_shared = self.init_shared(cfg.REGION_B_TOTAL)
+        repl_array_shared = self.init_shared(cfg.REGION_B_TOTAL)
 
         window_idxs = [(i, j) for i, j in
-                    itertools.product(range(0, cfg.R_CHUNKS_X),
-                                        range(0, cfg.R_CHUNKS_Z))]
+                    itertools.product(range(0, cfg.REGION_C_X),
+                                        range(0, cfg.REGION_C_Z))]
 
         with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (air_array_shared, water_array_shared, repl_array_shared, region))) as pool:
             res = pool.map(self.worker_fun, window_idxs)
@@ -100,8 +100,8 @@ class ClassifierMPMT:
         pool.join()
 
         self.classified_air_region = self.tonumpyarray(air_array_shared)
-        self.classified_air_region.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
+        self.classified_air_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         self.classified_water_region = self.tonumpyarray(water_array_shared)
-        self.classified_water_region.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
+        self.classified_water_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         self.classified_repl_region = self.tonumpyarray(repl_array_shared)
-        self.classified_repl_region.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
+        self.classified_repl_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)

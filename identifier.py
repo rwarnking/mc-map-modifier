@@ -68,9 +68,9 @@ class Identifier:
 
         classified_repl_region = ndimage.binary_erosion(classified_repl_region, structure=np.ones((self.repl_area, self.repl_area, self.repl_area))).astype(classified_repl_region.dtype)
         arr3, num3 = label(classified_repl_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
-        print(num1)
-        print(num2)
-        print(num3)
+        print(num1) # last label count = 487
+        print(num2) # last label count = 9
+        print(num3) # last label count = 16 for border = 2
 
         # TODO place into the meta_info file and merge with classifier
         self.blocks_chunk_x = 16
@@ -83,15 +83,13 @@ class Identifier:
         self.size_y = self.blocks_chunk_y
         self.size_z = self.max_chunk_z * self.blocks_chunk_z
 
-        # self.identified = np.zeros((self.blocks_chunk_x * self.max_chunk_x, self.blocks_chunk_y, self.blocks_chunk_z * self.max_chunk_z), dtype=int)
-
         changeCountWater = 0
         changeCountAir = 0
         changeCountRepl = 0
 
 ###################################################################################################
 
-        # TODO parallelise
+        # TODO check for amount of label and then parallelise if needed
         identified_shared = self.init_shared(self.size_x * self.size_y * self.size_z)
         # TODO unnecessary elements are tested: [i for i in range(1, 82, 20)] => [1, 21, 41, 61, 81]
         # 81 upto 101 are tested even if 82 is the max
@@ -108,18 +106,6 @@ class Identifier:
 
 ###################################################################################################
 
-        # TODO check for amount num1 after waterfix -> last label count = 503
-        # for idx in range(1, num1):
-        #     result = np.nonzero(arr1 == idx)
-        #     lenght = len(result[0])
-
-        #     # TODO use parameter for length
-        #     if lenght <= self.apocket_size and self.check_all(classified_air_region, result, G_AIR):
-        #         self.fill_array(result, AIRPOCKET)
-        #         changeCountAir += lenght
-
-        # last label count = 9
-
         # TODO the problem is, that the blocks are first replaced with water but
         # afterwards replaced again due to the relacementtest
         # for smaller sizes this should be fixed by the tickness test, but for bigger pockets
@@ -132,58 +118,21 @@ class Identifier:
                 self.fill_array(self.identified, result, cfg.WATERBLOCK)
                 changeCountWater += lenght
 
-        # last label count = 56
         for idx in range(1, num3):
             result = np.nonzero(arr3 == idx)
-
-            # x = result[0][0]
-            # y = result[1][0]
-            # z = result[2][0]
-
-            #block_class = classified_repl_region[x, y, z]
             lenght = len(result[0])
 
-            # if self.air_pockets == 1 and lenght <= air_p_size and block_class == G_AIR:
-            #     self.fill_array(result, AIRPOCKET)
-            #     changeCountAir += lenght
-            # elif self.water_blocks == 1 and lenght <= water_p_size and block_class == G_SOLID:
-            #     # TODO water check is missing
-            #     # TODO water could be below and air above
-            #     self.fill_array(result, WATERBLOCK)
-            #     changeCountWater += lenght
-            # # TODO bordercheck needed here
-            # if self.repl_blocks == 1 and block_class == G_SOLID: # TODO
+            # if self.repl_blocks == 1: # TODO
             self.fill_array(self.identified, result, cfg.SOLIDAREA)
             changeCountRepl += lenght
 
-            # if idx % 20 == 0:
-            #     print(idx)
-
-        # 17914937
-        # print(changeCountRepl)
-
-        # for idx in range(4, 5):
-        #     result = np.nonzero(self.identified == idx)
-        #     print(f"Length of self.identified == {idx}")
-        #     print(len(result[0]))
-
         return [changeCountWater, changeCountAir, changeCountRepl]
-
-        # print(num)
-        # np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
 
     # TODO is there a numpy function for this?
     def fill_array(self, arr, result, value):
         arr[result[0], result[1], result[2]] = value
 
-        # list_of_indices = list(zip(result[0], result[1], result[2]))
-
-        # for xyz in list_of_indices:
-        #     x2, y2, z2 = xyz
-        #     self.identified[x2, y2, z2] = value
-
     # TODO can this be done better?
-
     # Returns false if there is a value in the array that is not equal to the value-parameter
     def check_all(self, array, result, value):
         list_of_indices = list(zip(result[0], result[1], result[2]))
@@ -205,7 +154,7 @@ class Identifier:
 
 
 
-
+    # TODO combine with classifier mp
     def init_shared(self, ncell):
         '''Create shared value array for processing.'''
         shared_array_base = mp.Array(ctypes.c_int, ncell, lock=False)
