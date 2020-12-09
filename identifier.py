@@ -13,10 +13,15 @@ G_WATER = 2
 G_SOLID = 3
 G_TRANSPARENT = 4
 
+import ctypes
+import multiprocessing as mp
+from multiprocessing.pool import ThreadPool
+from contextlib import contextmanager, closing
+
 class Identifier:
 
     def __init__(self, meta_info, c_all = False):
-        self.identified = np.zeros((16, 256, 16), dtype=int)
+        # self.identified = np.zeros((16, 256, 16), dtype=int) # TODO remove
 
         self.wp_size = int(meta_info.wpocket_size.get())
         self.apocket_size = int(meta_info.apocket_size.get())
@@ -141,6 +146,15 @@ class Identifier:
 
         return [self.changeCountWater, self.changeCountAir, self.changeCountRepl]
 
+
+    # TODO np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
+    # TODO each array does add approx 20 secounds to the classify process
+    # times
+    # classify: 77517
+    # identify: 175945
+    # modify: 560962
+    # save: 180618
+    # total: 996793
     def identify_label(self, classified_air_region, classified_water_region, classified_repl_region):
         # TODO use a different way to bild this array np.ones((self.repl_area, self.repl_area, self.repl_area))
         str_3D=np.array([[[1, 1, 1],
@@ -155,67 +169,63 @@ class Identifier:
             [1, 1, 1],
             [1, 1, 1]]])
 
-        # times
-        # classify: 77517
-        # identify: 175945
-        # modify: 560962
-        # save: 180618
-        # total: 996793
-
-        # TODO
+        # TODO rename and merge import and put import at the top
         from scipy.ndimage import label as label2
-        # arr, num = label2(classified_region, str_3D)
-
-        # print(f"label2 num: {num}")
-
+        from scipy import ndimage
         from skimage.measure import label
 
-        # np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
-        # np.savetxt('data.csv', self.classified_region[1], fmt='%i', delimiter=',')
-        # arr1, num1 = label(classified_air_region, connectivity=2, return_num=True, background=0)
         arr1, num1 = label2(classified_air_region, str_3D)
         arr2, num2 = label(classified_water_region, connectivity=2, return_num=True, background=0) # TODO g_background
 
-        from scipy import ndimage
         classified_repl_region = ndimage.binary_erosion(classified_repl_region, structure=np.ones((self.repl_area, self.repl_area, self.repl_area))).astype(classified_repl_region.dtype)
         arr3, num3 = label(classified_repl_region, connectivity=2, return_num=True, background=0)
         print(num1)
         print(num2)
         print(num3)
 
+        # TODO place into the meta_info file and merge with classifier
         self.blocks_chunk_x = 16
         self.blocks_chunk_y = 256
         self.blocks_chunk_z = 16
         self.max_chunk_x = 32
         self.max_chunk_z = 32
-        self.identified = np.zeros((self.blocks_chunk_x * self.max_chunk_x, self.blocks_chunk_y, self.blocks_chunk_z * self.max_chunk_z), dtype=int)
+
+        self.size_x = self.max_chunk_x * self.blocks_chunk_x
+        self.size_y = self.blocks_chunk_y
+        self.size_z = self.max_chunk_z * self.blocks_chunk_z
+
+        # self.identified = np.zeros((self.blocks_chunk_x * self.max_chunk_x, self.blocks_chunk_y, self.blocks_chunk_z * self.max_chunk_z), dtype=int)
 
         changeCountWater = 0
         changeCountAir = 0
         changeCountRepl = 0
 
-        air_p_size = 1
-        water_p_size = 1
-
-        # num: 49
-        # 1: 49193926
-        # 3: 17914938
-        # for idx in range(0, 10):
-        #     result = np.nonzero(classified_region == idx)
-        #     print(f"Length of classified_region == {idx}")
-        #     print(len(result[0]))
+###################################################################################################
 
         # TODO parallelise
+        identified_shared = self.init_shared(self.size_x * self.size_y * self.size_z)
+        window_idxs = [i for i in range(1, num1, 20)]
+
+        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (identified_shared, classified_air_region, arr1))) as pool:
+            res = pool.map(self.worker_fun, window_idxs)
+
+        pool.close()
+        pool.join()
+
+        self.identified = self.tonumpyarray(identified_shared)
+        self.identified.shape = (self.size_x, self.size_y, self.size_z)
+
+###################################################################################################
 
         # TODO check for amount num1 after waterfix -> last label count = 503
-        for idx in range(1, num1):
-            result = np.nonzero(arr1 == idx)
-            lenght = len(result[0])
+        # for idx in range(1, num1):
+        #     result = np.nonzero(arr1 == idx)
+        #     lenght = len(result[0])
 
-            # TODO use parameter for length
-            if lenght <= self.apocket_size and self.check_all(classified_air_region, result, G_AIR):
-                self.fill_array(result, AIRPOCKET)
-                changeCountAir += lenght
+        #     # TODO use parameter for length
+        #     if lenght <= self.apocket_size and self.check_all(classified_air_region, result, G_AIR):
+        #         self.fill_array(result, AIRPOCKET)
+        #         changeCountAir += lenght
 
         # last label count = 9
 
@@ -228,7 +238,7 @@ class Identifier:
             lenght = len(result[0])
 
             if lenght <= self.wp_size:
-                self.fill_array(result, WATERBLOCK)
+                self.fill_array(self.identified, result, WATERBLOCK)
                 changeCountWater += lenght
 
         # last label count = 56
@@ -252,7 +262,7 @@ class Identifier:
             #     changeCountWater += lenght
             # # TODO bordercheck needed here
             # if self.repl_blocks == 1 and block_class == G_SOLID: # TODO
-            self.fill_array(result, SOLIDAREA)
+            self.fill_array(self.identified, result, SOLIDAREA)
             changeCountRepl += lenght
 
             # if idx % 20 == 0:
@@ -272,8 +282,8 @@ class Identifier:
         # np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
 
     # TODO is there a numpy function for this?
-    def fill_array(self, result, value):
-        self.identified[result[0], result[1], result[2]] = value
+    def fill_array(self, arr, result, value):
+        arr[result[0], result[1], result[2]] = value
 
         # list_of_indices = list(zip(result[0], result[1], result[2]))
 
@@ -292,3 +302,56 @@ class Identifier:
             if array[x, y, z] != value:
                 return False
         return True
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def init_shared(self, ncell):
+        '''Create shared value array for processing.'''
+        shared_array_base = mp.Array(ctypes.c_int, ncell, lock=False)
+        return(shared_array_base)
+
+    def tonumpyarray(self, shared_array):
+        '''Create numpy array from shared memory.'''
+        nparray = np.frombuffer(shared_array, dtype = ctypes.c_int)
+        assert nparray.base is shared_array
+        return nparray
+
+    def init_worker(self, identified_shared_, classified_air_region_, arr1_):
+        '''Initialize worker for processing.
+
+        Args:
+            shared_array_: Object returned by init_shared
+        '''
+        global identified_shared
+        global classified_air_region
+        global arr1
+
+        identified_shared = self.tonumpyarray(identified_shared_)
+        classified_air_region = classified_air_region_
+        arr1 = arr1_
+
+    # TODO rename
+    def worker_fun(self, ix):
+        '''Function to be run inside each worker'''
+        identified_shared.shape = (self.size_x, self.size_y, self.size_z)
+        num = ix
+
+        # TODO 20 variable
+        for idx in range(num, num + 20):
+            result = np.nonzero(arr1 == idx)
+            lenght = len(result[0])
+
+            # TODO self.apocket_size
+            if lenght <= 1 and self.check_all(classified_air_region, result, G_AIR):
+                self.fill_array(identified_shared, result, AIRPOCKET)
+                # changeCountAir += lenght
