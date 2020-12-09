@@ -19,6 +19,8 @@ class Identifier:
         self.identified = np.zeros((16, 256, 16), dtype=int)
 
         self.wp_size = int(meta_info.wpocket_size.get())
+        self.apocket_size = int(meta_info.apocket_size.get())
+        self.repl_area = int(meta_info.repl_area.get()) * 2 + 1
 
         self.water_blocks = meta_info.water_blocks.get()
         self.air_pockets = meta_info.air_pockets.get()
@@ -140,40 +142,7 @@ class Identifier:
         return [self.changeCountWater, self.changeCountAir, self.changeCountRepl]
 
     def identify_label(self, classified_air_region, classified_water_region, classified_repl_region):
-        #         subset1=np.array([
-        #     [[0, 0, 0],
-        #     [0, 0, 0],
-        #     [0, 0, 0]],
-
-        #     [[0, 0, 0],
-        #     [0, 1, 0],
-        #     [0, 0, 0]],
-
-        #     [[0, 0, 0],
-        #     [0, 0, 0],
-        #     [0, 0, 0]],
-
-        #     [[0, 1, 0],
-        #     [1, 1, 1],
-        #     [0, 1, 0]],
-
-        #     [[0, 0, 0],
-        #     [0, 0, 0],
-        #     [0, 0, 0]]
-        #     ])
-
-        # subset2=np.array([[[1, 1, 1],
-        #     [1, 1, 1],
-        #     [1, 1, 1]],
-
-        #     [[1, 1, 1],
-        #     [1, 2, 1],
-        #     [1, 1, 1]],
-
-        #     [[1, 1, 1],
-        #     [1, 1, 1],
-        #     [1, 1, 1]]])
-
+        # TODO use a different way to bild this array np.ones((self.repl_area, self.repl_area, self.repl_area))
         str_3D=np.array([[[1, 1, 1],
             [1, 1, 1],
             [1, 1, 1]],
@@ -203,10 +172,13 @@ class Identifier:
 
         # np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
         # np.savetxt('data.csv', self.classified_region[1], fmt='%i', delimiter=',')
-        # arr1, num1 = label(classified_air_region, connectivity=2, return_num=True, background=0) # TODO g_background
+        # arr1, num1 = label(classified_air_region, connectivity=2, return_num=True, background=0)
         arr1, num1 = label2(classified_air_region, str_3D)
         arr2, num2 = label(classified_water_region, connectivity=2, return_num=True, background=0) # TODO g_background
-        arr3, num3 = label(classified_repl_region, connectivity=2, return_num=True, background=0) # TODO g_background
+
+        from scipy import ndimage
+        classified_repl_region = ndimage.binary_erosion(classified_repl_region, structure=np.ones((self.repl_area, self.repl_area, self.repl_area))).astype(classified_repl_region.dtype)
+        arr3, num3 = label(classified_repl_region, connectivity=2, return_num=True, background=0)
         print(num1)
         print(num2)
         print(num3)
@@ -240,7 +212,8 @@ class Identifier:
             result = np.nonzero(arr1 == idx)
             lenght = len(result[0])
 
-            if lenght <= 1:
+            # TODO use parameter for length
+            if lenght <= self.apocket_size and self.check_all(classified_air_region, result, G_AIR):
                 self.fill_array(result, AIRPOCKET)
                 changeCountAir += lenght
 
@@ -254,7 +227,7 @@ class Identifier:
             result = np.nonzero(arr2 == idx)
             lenght = len(result[0])
 
-            if lenght <= 2:
+            if lenght <= self.wp_size:
                 self.fill_array(result, WATERBLOCK)
                 changeCountWater += lenght
 
@@ -308,3 +281,14 @@ class Identifier:
         #     x2, y2, z2 = xyz
         #     self.identified[x2, y2, z2] = value
 
+    # TODO can this be done better?
+
+    # Returns false if there is a value in the array that is not equal to the value-parameter
+    def check_all(self, array, result, value):
+        list_of_indices = list(zip(result[0], result[1], result[2]))
+
+        for xyz in list_of_indices:
+            x, y, z = xyz
+            if array[x, y, z] != value:
+                return False
+        return True

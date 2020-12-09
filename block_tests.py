@@ -247,7 +247,6 @@ def get_type(block_id):
     else:
         return G_SOLID
 
-# TODO make replacement type
 def get_repl_type(block_id):
     if is_repl_block(block_id):
         return G_SOLID
@@ -259,11 +258,13 @@ def get_repl_type(block_id):
 # wenn kleiner als schwellwert, dann gehe alle blocks durch - wenn keiner davon ein transparenter
 # block ist, handelt es sich um ein pocket
 
-# TODO addö water
+# make two arrays one only for air and one for both, dialate the first
+# and check all blocks if they are transparent -> needs more ram but
+# it should reduce the amount of labels found
 def get_air_type(block_id):
     if is_air(block_id):
         return G_AIR
-    elif is_transparent(block_id):
+    elif is_transparent(block_id) or is_water(block_id):
         return G_TRANSPARENT
     else:
         return G_BACKGROUND
