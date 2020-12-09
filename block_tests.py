@@ -1,3 +1,6 @@
+# For globals
+import config as cfg
+
 air_blocks = [
     'air',
     'cave_air'
@@ -228,17 +231,15 @@ def is_repl_block(block_id):
 
 ###################################################################################################
 
-import config as cfg # TODO
-
-def get_type(block_id):
-    if is_air(block_id):
-        return cfg.G_AIR
-    elif is_water(block_id):
-        return cfg.G_WATER
-    elif is_transparent(block_id):
-        return cfg.G_TRANSPARENT
-    else:
-        return cfg.G_SOLID
+# def get_type(block_id):
+#     if is_air(block_id):
+#         return cfg.G_AIR
+#     elif is_water(block_id):
+#         return cfg.G_WATER
+#     elif is_transparent(block_id):
+#         return cfg.G_TRANSPARENT
+#     else:
+#         return cfg.G_SOLID
 
 def get_repl_type(block_id):
     if is_repl_block(block_id):

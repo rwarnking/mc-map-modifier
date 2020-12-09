@@ -21,10 +21,9 @@ from time import gmtime, strftime
 from tkinter import messagebox
 
 # Own imports
-from classifier import Classifier
 from identifier import Identifier
-from classifier_mp_mt import ClassifierMPMT
-from block_tests import is_solid, get_type
+from classifier_mp import ClassifierMP
+from block_tests import is_solid
 
 import config as cfg
 
@@ -32,131 +31,15 @@ class Modifier():
     def __init__(self, meta_info):
         self.meta_info = meta_info
 
-        self.max_chunkX = 32
-        self.max_chunkZ = 32
-
+        # TODO
         self.changeCountWater = 0
         self.changeCountAir = 0
         self.changeCountRepl = 0
 
-        # TODO
-        self.max_chunk_x = 32
-        self.max_chunk_z = 32
-
-        self.block_size_x = 16
-        self.block_size_y = 256
-        self.block_size_z = 16
-
-        self.size_x = self.max_chunk_x * self.block_size_x
-        self.size_y = 256
-        self.size_z = self.max_chunk_z * self.block_size_z
-
-    ###############################################################################################
-    # Checks
-    ###############################################################################################
-    def check_neighbours_v(self, states, x, y, z, validator, amount = 1):
-        if (x <= 0 or y <= 0 or z <= 0
-            or x >= 15 or y >= 255 or z >= 15):
-            return False
-
-        for i in range(x - amount, x + amount + 1):
-            for j in range(y - amount, y + amount + 1):
-                for k in range(z - amount, z + amount + 1):
-                    if not (x == i and y == j and z == k):
-                        if validator(states[i, j, k]):
-                            return False
-        return True
-
-    def check_neighbours_v_2(self, states, x, y, z, validator, limit = 1, amount = 1):
-        if (x <= 0 or y <= 0 or z <= 0
-            or x >= 15 or y >= 255 or z >= 15):
-            return False
-
-        neighbour = True
-
-        for i in range(x - amount, x + amount + 1):
-            for j in range(y - amount, y + amount + 1):
-                for k in range(z - amount, z + amount + 1):
-                    if not (x == i and y == j and z == k):
-                        if validator(states[i, j, k]):
-                            if neighbour == True:
-                                neighbour = [i, j, k]
-                            else:
-                                return False
-
-        return neighbour
-
-    def check_water_blocks(self, wp_size, states, x, y, z):
-        if states[x, y, z] == G_SOLID:
-            if wp_size == 1:
-                return self.check_neighbours_v(states, x, y, z, lambda s: s != G_WATER)
-            # TODO this is kinda stupid because for every block the 2-case applies, the test is run
-            # instead mark all blocks that are processed here
-            elif wp_size == 2:
-                res = self.check_neighbours_v_2(states, x, y, z, lambda s: s != G_WATER)
-                if isinstance(res, bool):
-                    return res
-                res = self.check_neighbours_v_2(states, res[0], res[1], res[2], lambda s: s != G_WATER)
-                return res != False
-            else:
-                return self.check_neighbours_v(states, x, y, z, lambda s: s != G_WATER)
-        return False
-
-    def check_air_pockets(self, states, x, y, z):
-        if states[x, y, z] == G_AIR:
-            return self.check_neighbours_v(states, x, y, z, lambda s: s == G_AIR or s == G_WATER or s == G_TRANSPARENT)
-        return False
-
-    def check_solid_area(self, states, x, y, z):
-        # TODO what about water? is it in transparent blocks? + lava
-        if states[x, y, z] == G_SOLID:
-            return self.check_neighbours_v(states, x, y, z, lambda s: s == G_AIR or s == G_WATER or s == G_TRANSPARENT)
-        return False
-
     ###############################################################################################
     # Copy
     ###############################################################################################
-    def classify(self, chunk, classified):
-        x = 0
-        y = 0
-        z = 0
-
-        for block in chunk.stream_chunk():
-            classified[x, y, z] = get_type(block.id)
-
-            # TODO self.blocks_chunk_x
-            if z == 15 and x == 15:
-                y += 1
-            if x == 15:
-                z = (z + 1) % 16
-            x = (x + 1) % 16
-
-    def identify(self, chunk, states, new_states):
-        wp_size = int(self.meta_info.wpocket_size.get())
-
-        x = 0
-        y = 0
-        z = 0
-        for block in chunk.stream_chunk():
-            if self.water_blocks == 1 and self.check_water_blocks(wp_size, states, x, y, z):
-                new_states[x, y, z] = WATERBLOCK
-                self.changeCountWater += 1
-            elif self.air_pockets == 1 and self.check_air_pockets(states, x, y, z):
-                new_states[x, y, z] = AIRPOCKET
-                self.changeCountAir += 1
-            elif self.repl_blocks == 1 and self.check_solid_area(states, x, y, z):
-                new_states[x, y, z] = SOLIDAREA
-                self.changeCountRepl += 1
-            else:
-                new_states[x, y, z] = UNCHANGED
-
-            if z == 15 and x == 15:
-                y += 1
-            if x == 15:
-                z = (z + 1) % 16
-            x = (x + 1) % 16
-
-    def modify(self, states, chunk, replChunk, newRegion, chunkX, chunkZ):
+    def modify(self, chunk, replChunk, newRegion, chunk_x, chunk_z):
         newChunk = 0
         x = 0
         y = 0
@@ -173,77 +56,15 @@ class Modifier():
         for block in chunk.stream_chunk():
             b = block
 
-            xyz = states[x, y, z]
-            if xyz == WATERBLOCK:
-                b = water
-                print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
-                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-            elif xyz == AIRPOCKET:
-                b = gold_block
-                if replChunk:
-                    newBlock = replChunk.get_block(x, y, z)
-                    # TODO expand is_solid list
-                    if is_solid(newBlock.id):
-                        b = newBlock
-                        b = blue_wool
-                print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
-                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-            elif xyz == SOLIDAREA:
-                if replChunk:
-                    newBlock = replChunk.get_block(x, y, z)
-                    # Replace the block if it is solid but use the original when it is not
-                    if is_solid(newBlock.id):
-                        b = newBlock
-                        # TODO debug version
-                        b = diamond_block
-            elif xyz == UNCHECKED:
-                print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
-                #print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-            elif xyz != UNCHANGED:
-                print(f'Found unidentified Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}) with {stateArray[x, y, z]}, this should not happen')
-                print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-
-            try:
-                newChunk = newRegion.set_block(b, newRegion.x * 512 + chunkX * 16 + x, y, newRegion.z * 512 + chunkZ * 16 + z)
-            except:
-                print(f'could not set Block ({x},{y},{z})')
-
-            if z == 15 and x == 15:
-                y += 1
-            if x == 15:
-                z = (z + 1) % 16
-            x = (x + 1) % 16
-
-        newChunk.set_data(chunk.data)
-
-
-
-    def modify2(self, chunk, replChunk, newRegion, chunkX, chunkZ):
-        newChunk = 0
-        x = 0
-        y = 0
-        z = 0
-
-        # Create `Block` objects that are used to set blocks
-        stone = anvil.Block('minecraft', 'stone')
-        water = anvil.Block('minecraft', 'water')
-        diamond_block = anvil.Block('minecraft', 'diamond_block')
-        gold_block = anvil.Block('minecraft', 'gold_block')
-        blue_wool = anvil.Block('minecraft', 'blue_wool')
-
-        # Iterate all blocks and select write the new block to the newChunk
-        for block in chunk.stream_chunk():
-            b = block
-
-            x_region = chunkX * 16 + x
-            z_region = chunkZ * 16 + z
+            x_region = chunk_x * 16 + x
+            z_region = chunk_z * 16 + z
             x_global = newRegion.x * 512 + x_region
             z_global = newRegion.z * 512 + z_region
 
             xyz = self.identifier.identified[x_region, y, z_region]
             if xyz == cfg.WATERBLOCK:
                 b = water
-                print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
+                print(f'Found water Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunk_z})')
                 print(f'GlobalPos: ({x_global}, {y}, {z_global})')
             elif xyz == cfg.AIRPOCKET:
                 b = gold_block
@@ -253,7 +74,7 @@ class Modifier():
                 #     if is_solid(newBlock.id):
                 #         b = newBlock
                 #         b = blue_wool
-                print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
+                print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunk_z})')
                 print(f'GlobalPos: ({x_global}, {y}, {z_global})')
             elif xyz == cfg.SOLIDAREA:
             # if xyz == SOLIDAREA:
@@ -265,10 +86,10 @@ class Modifier():
                     # TODO debug version
                     b = diamond_block
             # elif xyz == UNCHECKED:
-            #     print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
-                #print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
+            #     print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunk_z}), this should not happen')
+                #print(f'GlobalPos: ({newRegion.x * 512 + chunk_x * 16 + x}, {y}, {newRegion.z * 512 + chunk_z * 16 + z})')
             elif xyz != cfg.UNCHANGED2:
-                print(f'Found unidentified Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}) with {xyz}, this should not happen')
+                print(f'Found unidentified Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunchunk_zkZ}) with {xyz}, this should not happen')
                 print(f'GlobalPos: ({x_global}, {y}, {z_global})')
 
             try:
@@ -284,86 +105,9 @@ class Modifier():
 
         newChunk.set_data(chunk.data)
 
-
-
-
     ###############################################################################################
 
-    def copy_chunk_1(self, newRegion, region, replRegion, chunkX, chunkZ):
-        chunk = None
-        try:
-            chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
-        except:
-            print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
-
-        if chunk:
-            classified = np.zeros((16, 256, 16), dtype=int)
-            self.classify(chunk, classified)
-
-            identified = np.zeros((16, 256, 16), dtype=int)
-            self.identify(chunk, classified, identified)
-
-            # TODO only when the option is tikced?
-            replChunk = False
-            if replRegion:
-                try:
-                    replChunk = anvil.Chunk.from_region(replRegion, chunkX, chunkZ)
-                except:
-                    print(f'Could not create replacement chunk for {chunkX}, {chunkZ}.')
-
-            self.modify(identified, chunk, replChunk, newRegion, chunkX, chunkZ)
-
-
-    def copy_chunk_2(self, newRegion, region, replRegion, chunkX, chunkZ):
-        chunk = None
-        try:
-            chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
-        except:
-            print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
-
-        if chunk:
-            self.classifier.classify_one(chunk, chunkX, chunkZ)
-            self.classified_region = self.classifier.classified_region
-
-            self.changeCountWater, self.changeCountAir, self.changeCountRepl = self.identifier.identify(chunk, self.classified_region, chunkX, chunkZ)
-            identified = self.identifier.identified
-
-            # TODO only when the option is ticked?
-            replChunk = False
-            if replRegion:
-                try:
-                    replChunk = anvil.Chunk.from_region(replRegion, chunkX, chunkZ)
-                except:
-                    print(f'Could not create replacement chunk for {chunkX}, {chunkZ}.')
-
-            self.modify(identified, chunk, replChunk, newRegion, chunkX, chunkZ)
-
-
-    def copy_chunk_3(self, newRegion, region, replRegion, chunkX, chunkZ):
-        chunk = None
-        try:
-            chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
-        except:
-            print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
-
-        if chunk:
-            self.changeCountWater, self.changeCountAir, self.changeCountRepl = self.identifier.identify(chunk, self.classified_region, chunkX, chunkZ)
-            identified = self.identifier.identified
-
-            # TODO only when the option is ticked?
-            replChunk = False
-            if replRegion:
-                try:
-                    replChunk = anvil.Chunk.from_region(replRegion, chunkX, chunkZ)
-                except:
-                    print(f'Could not create replacement chunk for {chunkX}, {chunkZ}.')
-
-            self.modify(identified, chunk, replChunk, newRegion, chunkX, chunkZ)
-
-
-
-
-    def copy_chunk_4(self, new_region, region, repl_region, chunk_x, chunk_z):
+    def copy_chunk(self, new_region, region, repl_region, chunk_x, chunk_z):
         chunk = None
         try:
             chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
@@ -379,150 +123,19 @@ class Modifier():
                 except:
                     print(f'Could not create replacement chunk for {chunk_x}, {chunk_z}.')
 
-            self.modify2(chunk, repl_chunk, new_region, chunk_x, chunk_z)
+            self.modify(chunk, repl_chunk, new_region, chunk_x, chunk_z)
 
     ###############################################################################################
 
-    def copy_chunks_1(self, newRegion, region, replRegion):
-        # TODO
-        max_chunkX = 32
-        max_chunkZ = 32
-        # for chunkX in range(max_chunkX):
-        for chunkX in range(10, 12):
-
-            ms = int(round(time.time() * 1000))
-            # for chunkZ in range(max_chunkZ):
-            for chunkZ in range(11, 16):
-                self.copy_chunk_1(newRegion, region, replRegion, chunkX, chunkZ)
-                self.meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
-
-            ms2 = int(round(time.time() * 1000))
-            self.meta_info.elapsed_time += (ms2 - ms) / 1000
-            t_per_chunk = self.meta_info.elapsed_time / (self.meta_info.chunk_count_max * self.meta_info.file_count + self.meta_info.chunk_count)
-            self.meta_info.estimated_time = ((self.meta_info.chunk_count_max - self.meta_info.chunk_count) \
-                + (self.meta_info.file_count_max - self.meta_info.file_count - 1) * self.meta_info.chunk_count_max) * t_per_chunk
-
-
-    def copy_chunks_2(self, newRegion, region, replRegion):
-        # TODO
-        max_chunkX = 32
-        max_chunkZ = 32
-        self.classifier = Classifier()
-        self.identifier = Identifier(self.meta_info)
-
-        # for chunkX in range(max_chunkX):
-        for chunkX in range(10, 12):
-
-            ms = int(round(time.time() * 1000))
-            # for chunkZ in range(max_chunkZ):
-            for chunkZ in range(11, 16):
-                self.copy_chunk_2(newRegion, region, replRegion, chunkX, chunkZ)
-                self.meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
-
-            ms2 = int(round(time.time() * 1000))
-            self.meta_info.elapsed_time += (ms2 - ms) / 1000
-            t_per_chunk = self.meta_info.elapsed_time / (self.meta_info.chunk_count_max * self.meta_info.file_count + self.meta_info.chunk_count)
-            self.meta_info.estimated_time = ((self.meta_info.chunk_count_max - self.meta_info.chunk_count) \
-                + (self.meta_info.file_count_max - self.meta_info.file_count - 1) * self.meta_info.chunk_count_max) * t_per_chunk
-
-    def copy_chunks_3(self, newRegion, region, replRegion):
-        # TODO
-        max_chunkX = 32
-        max_chunkZ = 32
-        classifier = Classifier(True)
-        classifier.classify_all(region)
-        self.classified_region = classifier.classified_region
-        # print(classifier.classified_region[0,0,0])
-
-        # for i in range(self.size_x):
-        #     for j in range(self.size_y):
-        #         for k in range(self.size_z):
-        #             if classifier.classified_region[i,j,k] > 0:
-        #                 print("hi")
-        # np.savetxt('data.csv', self.classified_region[0], delimiter=',')
-
-        self.identifier = Identifier(self.meta_info, True)
-
-        # for chunkX in range(max_chunkX):
-        for chunkX in range(10, 12):
-
-            ms = int(round(time.time() * 1000))
-            # for chunkZ in range(max_chunkZ):
-            for chunkZ in range(11, 16):
-                self.copy_chunk_3(newRegion, region, replRegion, chunkX, chunkZ)
-                self.meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
-
-            ms2 = int(round(time.time() * 1000))
-            self.meta_info.elapsed_time += (ms2 - ms) / 1000
-            t_per_chunk = self.meta_info.elapsed_time / (self.meta_info.chunk_count_max * self.meta_info.file_count + self.meta_info.chunk_count)
-            self.meta_info.estimated_time = ((self.meta_info.chunk_count_max - self.meta_info.chunk_count) \
-                + (self.meta_info.file_count_max - self.meta_info.file_count - 1) * self.meta_info.chunk_count_max) * t_per_chunk
-
-    def copy_chunks_4(self, newRegion, region, replRegion):
-        # TODO
-        max_chunkX = 32
-        max_chunkZ = 32
-
-        classifier_mp_mt = ClassifierMPMT()
-        classifier_mp_mt.classify_all_mp(region)
-        self.classified_region = classifier_mp_mt.classified_region
-
-        self.identifier = Identifier(self.meta_info, True)
-
-        # for chunkX in range(max_chunkX):
-        for chunkX in range(10, 12):
-
-            ms = int(round(time.time() * 1000))
-            # for chunkZ in range(max_chunkZ):
-            for chunkZ in range(11, 16):
-                self.copy_chunk_3(newRegion, region, replRegion, chunkX, chunkZ)
-                self.meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
-
-            ms2 = int(round(time.time() * 1000))
-            self.meta_info.elapsed_time += (ms2 - ms) / 1000
-            t_per_chunk = self.meta_info.elapsed_time / (self.meta_info.chunk_count_max * self.meta_info.file_count + self.meta_info.chunk_count)
-            self.meta_info.estimated_time = ((self.meta_info.chunk_count_max - self.meta_info.chunk_count) \
-                + (self.meta_info.file_count_max - self.meta_info.file_count - 1) * self.meta_info.chunk_count_max) * t_per_chunk
-
-    def copy_chunks_5(self, newRegion, region, replRegion):
-        # TODO
-        max_chunkX = 32
-        max_chunkZ = 32
-
-        classifier_mp_mt = ClassifierMPMT()
-        classifier_mp_mt.classify_all_mt(region)
-        self.classified_region = classifier_mp_mt.classified_region
-
-        self.identifier = Identifier(self.meta_info, True)
-
-        # for chunkX in range(max_chunkX):
-        for chunkX in range(10, 12):
-
-            ms = int(round(time.time() * 1000))
-            # for chunkZ in range(max_chunkZ):
-            for chunkZ in range(11, 16):
-                self.copy_chunk_3(newRegion, region, replRegion, chunkX, chunkZ)
-                self.meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
-
-            ms2 = int(round(time.time() * 1000))
-            self.meta_info.elapsed_time += (ms2 - ms) / 1000
-            t_per_chunk = self.meta_info.elapsed_time / (self.meta_info.chunk_count_max * self.meta_info.file_count + self.meta_info.chunk_count)
-            self.meta_info.estimated_time = ((self.meta_info.chunk_count_max - self.meta_info.chunk_count) \
-                + (self.meta_info.file_count_max - self.meta_info.file_count - 1) * self.meta_info.chunk_count_max) * t_per_chunk
-
-    def copy_chunks_6(self, newRegion, region, replRegion):
-        # TODO
-        max_chunkX = 32
-        max_chunkZ = 32
-
+    def copy_chunks(self, newRegion, region, replRegion):
         ms = int(round(time.time() * 1000))
 
-        classifier_mp_mt = ClassifierMPMT()
-        classifier_mp_mt.classify_all_mp(region)
+        classifier_mp = ClassifierMP()
+        classifier_mp.classify_all_mp(region)
         # TODO does the modifier need this?
-        self.classified_air_region = classifier_mp_mt.classified_air_region
-        self.classified_water_region = classifier_mp_mt.classified_water_region
-        self.classified_repl_region = classifier_mp_mt.classified_repl_region
+        self.classified_air_region = classifier_mp.classified_air_region
+        self.classified_water_region = classifier_mp.classified_water_region
+        self.classified_repl_region = classifier_mp.classified_repl_region
 
         ms2 = int(round(time.time() * 1000))
         print(f"Classifier time: {ms2 - ms}")
@@ -534,14 +147,14 @@ class Modifier():
         ms3 = int(round(time.time() * 1000))
         print(f"Identifier time: {ms3 - ms2}")
 
-        for chunkX in range(max_chunkX):
-        # for chunkX in range(10, 12):
+        for chunk_x in range(cfg.REGION_C_X):
+        # for chunk_x in range(10, 12):
 
             ms = int(round(time.time() * 1000))
-            for chunkZ in range(max_chunkZ):
-            # for chunkZ in range(11, 16):
-                self.copy_chunk_4(newRegion, region, replRegion, chunkX, chunkZ)
-                self.meta_info.chunk_count = chunkZ + 1 + chunkX * max_chunkZ
+            for chunk_z in range(cfg.REGION_C_Z):
+            # for chunk_z in range(11, 16):
+                self.copy_chunk(newRegion, region, replRegion, chunk_x, chunk_z)
+                self.meta_info.chunk_count = chunk_z + 1 + chunk_x * cfg.REGION_C_Z
 
             ms2 = int(round(time.time() * 1000))
             self.meta_info.elapsed_time += (ms2 - ms) / 1000
@@ -577,38 +190,15 @@ class Modifier():
         ms2 = int(round(time.time() * 1000))
         print(f"Setup regions time: {ms2 - ms}")
 
-        # max_chunkX = 1
-        # max_chunkZ = 1
-        # TODO self?
-        max_chunkX = 32
-        max_chunkZ = 32
+        # TODO use config file
         self.meta_info.chunk_count = 0
-        self.meta_info.chunk_count_max = max_chunkX * max_chunkZ
+        self.meta_info.chunk_count_max = cfg.REGION_C_X * cfg.REGION_C_Z
+        # TODO calculation not correct anymore
         self.meta_info.estimated_time = self.meta_info.chunk_count_max * self.meta_info.file_count_max
 
 ##########################################
 
-        # some chunks, one class, no write. time:
-        # 15344, 15454, 15426, 14826, 15127
-        # self.copy_chunks_1(newRegion, region, replRegion)
-
-        # some chunks, multiple classes, no write. time:
-        # 15437, 15678, 16431, 15245, 15107
-        # self.copy_chunks_2(newRegion, region, replRegion)
-
-        # some chunks, multiple classes, no write, one classifier array. time:
-        # 16963, 17202, 17311, 17044, 17307, 17436
-        # self.copy_chunks_3(newRegion, region, replRegion)
-
-        # some chunks, multiple classes, no write, one classifier array, multiprocessing. time:
-        # 61477, 64481, 61016
-        # self.copy_chunks_4(newRegion, region, replRegion)
-
-        # some chunks, multiple classes, no write, one classifier array, multithreading. time:
-        # 146684
-        # self.copy_chunks_5(newRegion, region, replRegion)
-
-        self.copy_chunks_6(newRegion, region, replRegion)
+        self.copy_chunks(newRegion, region, replRegion)
 
 ##########################################
 

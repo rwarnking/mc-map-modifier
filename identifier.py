@@ -1,18 +1,24 @@
 # For array manipulations
 import numpy as np
 
+# Multiprocessing
 import ctypes
 import multiprocessing as mp
 from multiprocessing.pool import ThreadPool
 from contextlib import contextmanager, closing
 
+# Image processing
+# TODO rename and merge import
+from scipy.ndimage import label as label2
+from scipy import ndimage
+from skimage.measure import label
+
+# Own import
 import config as cfg
 
 class Identifier:
 
     def __init__(self, meta_info, c_all = False):
-        # self.identified = np.zeros((16, 256, 16), dtype=int) # TODO remove
-
         self.wp_size = int(meta_info.wpocket_size.get())
         self.apocket_size = int(meta_info.apocket_size.get())
         self.repl_area = int(meta_info.repl_area.get()) * 2 + 1
@@ -25,45 +31,17 @@ class Identifier:
         self.changeCountAir = 0
         self.changeCountRepl = 0
 
-        if c_all:
-            # TODO vars should be variable (16, 32 ...)
-            self.upper_bound_x = 16 * 32
-            self.upper_bound_z = 16 * 32
-            self.offset_x = 1
-        else:
-            self.upper_bound_x = 15
-            self.upper_bound_z = 15
-            self.offset_x = 0
-            self.offset_z = 0
-
     # TODO np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
     # TODO each array does add approx 20 secounds to the classify process
     # times
-    # classify: 77517
-    # identify: 175945
-    # modify: 560962
-    # save: 180618
-    # total: 996793
+    # classify: 64048 - 86219
+    # identify: 62331 - 74528
+    # modify: 476081
+    # save: 208582
+    # total: 814072 upto 900000
     def identify_label(self, classified_air_region, classified_water_region, classified_repl_region):
-        # TODO use a different way to bild this array np.ones((self.repl_area, self.repl_area, self.repl_area))
-        str_3D=np.array([[[1, 1, 1],
-            [1, 1, 1],
-            [1, 1, 1]],
-
-            [[1, 1, 1],
-            [1, 1, 1],
-            [1, 1, 1]],
-
-            [[1, 1, 1],
-            [1, 1, 1],
-            [1, 1, 1]]])
-
-        # TODO rename and merge import and put import at the top
-        from scipy.ndimage import label as label2
-        from scipy import ndimage
-        from skimage.measure import label
-
-        arr1, num1 = label2(classified_air_region, str_3D)
+        arr1, num1 = label2(classified_air_region, np.ones((3, 3, 3)))
+        # TODO it seems like two blocks above each other are not correctly identified
         arr2, num2 = label(classified_water_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
 
         classified_repl_region = ndimage.binary_erosion(classified_repl_region, structure=np.ones((self.repl_area, self.repl_area, self.repl_area))).astype(classified_repl_region.dtype)
@@ -72,25 +50,17 @@ class Identifier:
         print(num2) # last label count = 9
         print(num3) # last label count = 16 for border = 2
 
-        # TODO place into the meta_info file and merge with classifier
-        self.blocks_chunk_x = 16
-        self.blocks_chunk_y = 256
-        self.blocks_chunk_z = 16
-        self.max_chunk_x = 32
-        self.max_chunk_z = 32
-
-        self.size_x = self.max_chunk_x * self.blocks_chunk_x
-        self.size_y = self.blocks_chunk_y
-        self.size_z = self.max_chunk_z * self.blocks_chunk_z
-
+        # TODO
         changeCountWater = 0
         changeCountAir = 0
         changeCountRepl = 0
 
 ###################################################################################################
+        # from mp_helper import MP_Helper
+        # self.mp_helper = MP_Helper() # TODO
 
         # TODO check for amount of label and then parallelise if needed
-        identified_shared = self.init_shared(self.size_x * self.size_y * self.size_z)
+        identified_shared = self.init_shared(cfg.REGION_B_TOTAL)
         # TODO unnecessary elements are tested: [i for i in range(1, 82, 20)] => [1, 21, 41, 61, 81]
         # 81 upto 101 are tested even if 82 is the max
         window_idxs = [i for i in range(1, num1, 20)]
@@ -102,7 +72,7 @@ class Identifier:
         pool.join()
 
         self.identified = self.tonumpyarray(identified_shared)
-        self.identified.shape = (self.size_x, self.size_y, self.size_z)
+        self.identified.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
 
 ###################################################################################################
 
@@ -133,8 +103,8 @@ class Identifier:
         arr[result[0], result[1], result[2]] = value
 
     # TODO can this be done better?
-    # Returns false if there is a value in the array that is not equal to the value-parameter
     def check_all(self, array, result, value):
+        '''Returns false if there is a value in the array that is not equal to the value-parameter.'''
         list_of_indices = list(zip(result[0], result[1], result[2]))
 
         for xyz in list_of_indices:
@@ -183,7 +153,7 @@ class Identifier:
     # TODO rename
     def worker_fun(self, ix):
         '''Function to be run inside each worker'''
-        identified_shared.shape = (self.size_x, self.size_y, self.size_z)
+        identified_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         num = ix
 
         # TODO 20 variable

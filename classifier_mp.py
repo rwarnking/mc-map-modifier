@@ -5,17 +5,16 @@ import anvil
 import ctypes
 import itertools
 import multiprocessing as mp
-from multiprocessing.pool import ThreadPool
-from contextlib import contextmanager, closing
+from contextlib import closing
 
 # For array manipulations
 import numpy as np
 
 # Own imports
-from block_tests import get_repl_type, get_air_type, get_water_type # TODO
+from block_tests import get_air_type, get_water_type, get_repl_type
 import config as cfg
 
-class ClassifierMPMT:
+class ClassifierMP:
 
     def __init__(self):
         self.jo = 0 # TODO delete
@@ -84,7 +83,6 @@ class ClassifierMPMT:
             x = (x + 1) % 16
 
     def classify_all_mp(self, region):
-        # TODO calc once and dont do it again
         air_array_shared = self.init_shared(cfg.REGION_B_TOTAL)
         water_array_shared = self.init_shared(cfg.REGION_B_TOTAL)
         repl_array_shared = self.init_shared(cfg.REGION_B_TOTAL)
