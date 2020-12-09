@@ -1,0 +1,28 @@
+# Blocks per chunk
+CHUNK_X = 16
+CHUNK_Y = 256
+CHUNK_Z = 16
+
+# Chunks per region
+R_CHUNKS_X = 32
+R_CHUNKS_Z = 32
+
+# Blocks per region
+REGION_X = R_CHUNKS_X * CHUNK_X
+REGION_Y = CHUNK_Y
+REGION_Z = R_CHUNKS_Z * CHUNK_Z
+
+# Classifier types
+G_BACKGROUND = 0
+G_AIR = 1
+G_WATER = 2
+G_SOLID = 3
+G_TRANSPARENT = 4
+
+# Identifier types
+UNCHECKED = 0
+UNCHANGED = 1
+UNCHANGED2 = 0
+WATERBLOCK = 2
+AIRPOCKET = 3
+SOLIDAREA = 4

@@ -12,7 +12,8 @@ from contextlib import contextmanager, closing
 import numpy as np
 
 # Own imports
-from block_tests import get_type, get_repl_type, get_air_type, get_water_type # TODO
+from block_tests import get_repl_type, get_air_type, get_water_type # TODO
+import config as cfg
 
 class ClassifierMPMT:
 
@@ -90,13 +91,13 @@ class ClassifierMPMT:
             x = (x + 1) % 16
 
     def classify_all_mp(self, region):
-        air_array_shared = self.init_shared(self.size_x * self.size_y * self.size_z)
-        water_array_shared = self.init_shared(self.size_x * self.size_y * self.size_z)
-        repl_array_shared = self.init_shared(self.size_x * self.size_y * self.size_z)
+        air_array_shared = self.init_shared(cfg.REGION_X * cfg.REGION_Y * cfg.REGION_Z)
+        water_array_shared = self.init_shared(cfg.REGION_X * cfg.REGION_Y * cfg.REGION_Z)
+        repl_array_shared = self.init_shared(cfg.REGION_X * cfg.REGION_Y * cfg.REGION_Z)
 
         window_idxs = [(i, j) for i, j in
-                    itertools.product(range(0, self.max_chunk_x),
-                                        range(0, self.max_chunk_z))]
+                    itertools.product(range(0, cfg.R_CHUNKS_X),
+                                        range(0, cfg.R_CHUNKS_Z))]
 
         with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (air_array_shared, water_array_shared, repl_array_shared, region))) as pool:
             res = pool.map(self.worker_fun, window_idxs)
@@ -105,25 +106,8 @@ class ClassifierMPMT:
         pool.join()
 
         self.classified_air_region = self.tonumpyarray(air_array_shared)
-        self.classified_air_region.shape = (self.size_x, self.size_y, self.size_z)
+        self.classified_air_region.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
         self.classified_water_region = self.tonumpyarray(water_array_shared)
-        self.classified_water_region.shape = (self.size_x, self.size_y, self.size_z)
+        self.classified_water_region.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
         self.classified_repl_region = self.tonumpyarray(repl_array_shared)
-        self.classified_repl_region.shape = (self.size_x, self.size_y, self.size_z)
-
-# https://stackoverflow.com/questions/3033952/threading-pool-similar-to-the-multiprocessing-pool
-    def classify_all_mt(self, region):
-        shared_array = self.init_shared(self.size_x * self.size_y * self.size_z)
-
-        window_idxs = [(i, j) for i, j in
-                    itertools.product(range(0, self.max_chunk_x),
-                                        range(0, self.max_chunk_z))]
-
-        with closing(ThreadPool(processes=4, initializer = self.init_worker, initargs = (shared_array, region))) as pool:
-            res = pool.map(self.worker_fun, window_idxs)
-
-        pool.close()
-        pool.join()
-
-        self.classified_region = self.tonumpyarray(shared_array)
-        self.classified_region.shape = (self.size_x, self.size_y, self.size_z)
+        self.classified_repl_region.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)

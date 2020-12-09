@@ -228,30 +228,23 @@ def is_repl_block(block_id):
 
 ###################################################################################################
 
-# TODO have this only once
-G_BACKGROUND = 0
-G_AIR = 1
-G_WATER = 2
-G_SOLID = 3
-G_TRANSPARENT = 4
+import config as cfg # TODO
 
 def get_type(block_id):
     if is_air(block_id):
-        return G_AIR
+        return cfg.G_AIR
     elif is_water(block_id):
-        # return G_WATER
-        return G_AIR
+        return cfg.G_WATER
     elif is_transparent(block_id):
-        # return G_TRANSPARENT
-        return G_AIR
+        return cfg.G_TRANSPARENT
     else:
-        return G_SOLID
+        return cfg.G_SOLID
 
 def get_repl_type(block_id):
     if is_repl_block(block_id):
-        return G_SOLID
+        return cfg.G_SOLID
     else:
-        return G_BACKGROUND
+        return cfg.G_BACKGROUND
 
 # TODO erkenne alle blöcke die transparent oder air sind als eine label (scipy.label)
 # dann checke wie groß eine region ist
@@ -263,11 +256,11 @@ def get_repl_type(block_id):
 # it should reduce the amount of labels found
 def get_air_type(block_id):
     if is_air(block_id):
-        return G_AIR
+        return cfg.G_AIR
     elif is_transparent(block_id) or is_water(block_id):
-        return G_TRANSPARENT
+        return cfg.G_TRANSPARENT
     else:
-        return G_BACKGROUND
+        return cfg.G_BACKGROUND
 
 # water:
 # markiere alle blocks als solid
@@ -276,6 +269,6 @@ def get_air_type(block_id):
 # wenn kleiner schwellwert, dann muss es sich um ein pocket handeln?
 def get_water_type(block_id):
     if is_water(block_id):
-        return G_BACKGROUND
+        return cfg.G_BACKGROUND
     else:
-        return G_SOLID
+        return cfg.G_SOLID

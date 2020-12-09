@@ -26,17 +26,7 @@ from identifier import Identifier
 from classifier_mp_mt import ClassifierMPMT
 from block_tests import is_solid, get_type
 
-UNCHECKED = 0
-UNCHANGED = 1
-UNCHANGED2 = 0
-WATERBLOCK = 2
-AIRPOCKET = 3
-SOLIDAREA = 4
-
-G_AIR = 1
-G_WATER = 2
-G_SOLID = 3
-G_TRANSPARENT = 4
+import config as cfg
 
 class Modifier():
     def __init__(self, meta_info):
@@ -251,11 +241,11 @@ class Modifier():
             z_global = newRegion.z * 512 + z_region
 
             xyz = self.identifier.identified[x_region, y, z_region]
-            if xyz == WATERBLOCK:
+            if xyz == cfg.WATERBLOCK:
                 b = water
                 print(f'Found water Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
                 print(f'GlobalPos: ({x_global}, {y}, {z_global})')
-            elif xyz == AIRPOCKET:
+            elif xyz == cfg.AIRPOCKET:
                 b = gold_block
                 # if replChunk:
                 #     newBlock = replChunk.get_block(x, y, z)
@@ -265,7 +255,7 @@ class Modifier():
                 #         b = blue_wool
                 print(f'Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ})')
                 print(f'GlobalPos: ({x_global}, {y}, {z_global})')
-            elif xyz == SOLIDAREA:
+            elif xyz == cfg.SOLIDAREA:
             # if xyz == SOLIDAREA:
                 if replChunk:
                     newBlock = replChunk.get_block(x, y, z)
@@ -277,7 +267,7 @@ class Modifier():
             # elif xyz == UNCHECKED:
             #     print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}), this should not happen')
                 #print(f'GlobalPos: ({newRegion.x * 512 + chunkX * 16 + x}, {y}, {newRegion.z * 512 + chunkZ * 16 + z})')
-            elif xyz != UNCHANGED2:
+            elif xyz != cfg.UNCHANGED2:
                 print(f'Found unidentified Block ({x},{y},{z}) in Chunk ({chunkX}, {chunkZ}) with {xyz}, this should not happen')
                 print(f'GlobalPos: ({x_global}, {y}, {z_global})')
 
