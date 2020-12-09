@@ -4,8 +4,7 @@ import numpy as np
 # Multiprocessing
 import ctypes
 import multiprocessing as mp
-from multiprocessing.pool import ThreadPool
-from contextlib import contextmanager, closing
+from contextlib import closing
 
 # Image processing
 # TODO rename and merge import
@@ -56,11 +55,11 @@ class Identifier:
         changeCountRepl = 0
 
 ###################################################################################################
-        # from mp_helper import MP_Helper
-        # self.mp_helper = MP_Helper() # TODO
+        from mp_helper import MP_Helper
+        self.mp_helper = MP_Helper()
 
         # TODO check for amount of label and then parallelise if needed
-        identified_shared = self.init_shared(cfg.REGION_B_TOTAL)
+        identified_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
         # TODO unnecessary elements are tested: [i for i in range(1, 82, 20)] => [1, 21, 41, 61, 81]
         # 81 upto 101 are tested even if 82 is the max
         window_idxs = [i for i in range(1, num1, 20)]
@@ -71,7 +70,7 @@ class Identifier:
         pool.close()
         pool.join()
 
-        self.identified = self.tonumpyarray(identified_shared)
+        self.identified = self.mp_helper.tonumpyarray(identified_shared)
         self.identified.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
 
 ###################################################################################################
@@ -125,28 +124,19 @@ class Identifier:
 
 
     # TODO combine with classifier mp
-    def init_shared(self, ncell):
-        '''Create shared value array for processing.'''
-        shared_array_base = mp.Array(ctypes.c_int, ncell, lock=False)
-        return(shared_array_base)
-
-    def tonumpyarray(self, shared_array):
-        '''Create numpy array from shared memory.'''
-        nparray = np.frombuffer(shared_array, dtype = ctypes.c_int)
-        assert nparray.base is shared_array
-        return nparray
-
     def init_worker(self, identified_shared_, classified_air_region_, arr1_):
         '''Initialize worker for processing.
 
         Args:
-            shared_array_: Object returned by init_shared
+            identified_shared_: ...
+            classified_air_region_: ...
+            arr1_: ...
         '''
         global identified_shared
         global classified_air_region
         global arr1
 
-        identified_shared = self.tonumpyarray(identified_shared_)
+        identified_shared = self.mp_helper.tonumpyarray(identified_shared_)
         classified_air_region = classified_air_region_
         arr1 = arr1_
 
