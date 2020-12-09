@@ -18,15 +18,7 @@ import config as cfg
 class ClassifierMPMT:
 
     def __init__(self):
-        self.blocks_chunk_x = 16
-        self.blocks_chunk_y = 256
-        self.blocks_chunk_z = 16
-        self.max_chunk_x = 32
-        self.max_chunk_z = 32
-
-        self.size_x = self.max_chunk_x * self.blocks_chunk_x
-        self.size_y = self.blocks_chunk_y
-        self.size_z = self.max_chunk_z * self.blocks_chunk_z
+        self.jo = 0 # TODO delete
 
     def init_shared(self, ncell):
         '''Create shared value array for processing.'''
@@ -58,32 +50,33 @@ class ClassifierMPMT:
     # TODO rename
     def worker_fun(self, ix):
         '''Function to be run inside each worker'''
-        air_array_shared.shape = (self.size_x, self.size_y, self.size_z)
-        water_array_shared.shape = (self.size_x, self.size_y, self.size_z)
-        repl_array_shared.shape = (self.size_x, self.size_y, self.size_z)
-        chunkX, chunkZ = ix
+        air_array_shared.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
+        water_array_shared.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
+        repl_array_shared.shape = (cfg.REGION_X, cfg.REGION_Y, cfg.REGION_Z)
+        chunk_x, chunk_z = ix
 
         try:
-            chunk = anvil.Chunk.from_region(region, chunkX, chunkZ)
+            chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
         except:
-            print(f'skipped non-existent chunk ({chunkX},{chunkZ})')
+            print(f'skipped non-existent chunk ({chunk_x},{chunk_z})')
 
         if chunk:
-            self.classify(chunk, chunkX, chunkZ)
+            self.classify(chunk, chunk_x, chunk_z)
 
     def classify(self, chunk, chunk_x, chunk_z):
         x = 0
         y = 0
         z = 0
-        blocks_chunk_x = 16
-        blocks_chunk_z = 16
+        chunk_b_x = cfg.CHUNK_X
+        chunk_b_z = cfg.CHUNK_Z
         for block in chunk.stream_chunk():
-            # shared_np_array[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_type(block.id)
-            air_array_shared[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_air_type(block.id)
-            water_array_shared[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_water_type(block.id)
-            repl_array_shared[x + blocks_chunk_x * chunk_x, y, z + blocks_chunk_z * chunk_z] = get_repl_type(block.id)
+            r_x = x + chunk_b_x * chunk_x
+            r_z = z + chunk_b_z * chunk_z
+            air_array_shared[r_x, y, r_z] = get_air_type(block.id)
+            water_array_shared[r_x, y, r_z] = get_water_type(block.id)
+            repl_array_shared[r_x, y, r_z] = get_repl_type(block.id)
 
-            # TODO self.blocks_chunk_x
+            # TODO chunk_b_x
             if z == 15 and x == 15:
                 y += 1
             if x == 15:
@@ -91,9 +84,10 @@ class ClassifierMPMT:
             x = (x + 1) % 16
 
     def classify_all_mp(self, region):
-        air_array_shared = self.init_shared(cfg.REGION_X * cfg.REGION_Y * cfg.REGION_Z)
-        water_array_shared = self.init_shared(cfg.REGION_X * cfg.REGION_Y * cfg.REGION_Z)
-        repl_array_shared = self.init_shared(cfg.REGION_X * cfg.REGION_Y * cfg.REGION_Z)
+        # TODO calc once and dont do it again
+        air_array_shared = self.init_shared(cfg.REGION_TOTAL)
+        water_array_shared = self.init_shared(cfg.REGION_TOTAL)
+        repl_array_shared = self.init_shared(cfg.REGION_TOTAL)
 
         window_idxs = [(i, j) for i, j in
                     itertools.product(range(0, cfg.R_CHUNKS_X),

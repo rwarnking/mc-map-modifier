@@ -2,6 +2,7 @@
 CHUNK_X = 16
 CHUNK_Y = 256
 CHUNK_Z = 16
+# TODO rename to CHUNK_B_X ?
 
 # Chunks per region
 R_CHUNKS_X = 32
@@ -11,6 +12,7 @@ R_CHUNKS_Z = 32
 REGION_X = R_CHUNKS_X * CHUNK_X
 REGION_Y = CHUNK_Y
 REGION_Z = R_CHUNKS_Z * CHUNK_Z
+REGION_TOTAL = REGION_X * REGION_Y * REGION_Z
 
 # Classifier types
 G_BACKGROUND = 0
