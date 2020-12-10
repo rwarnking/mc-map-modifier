@@ -13,6 +13,21 @@ REGION_B_Y = CHUNK_B_Y
 REGION_B_Z = REGION_C_Z * CHUNK_B_Z
 REGION_B_TOTAL = REGION_B_X * REGION_B_Y * REGION_B_Z
 
+# For estimated time
+# TODO these times may be dependend on the settings
+T_CLASSIFY = 80
+T_IDENTIFY = 70
+T_MODIFY = 500
+T_SAVE = 180
+
+# Algorithm steps
+A_CLASSIFY = 0
+A_IDENTIFY = 1
+A_MODIFY = 2
+A_SAVE = 3
+A_FINISHED = 4
+
+# TODO use C for classify globals and I for identify?
 # Classifier types
 G_BACKGROUND = 0
 G_AIR = 1
@@ -21,9 +36,8 @@ G_SOLID = 3
 G_TRANSPARENT = 4
 
 # Identifier types
-UNCHECKED = 0
-UNCHANGED = 1
-UNCHANGED2 = 0
-WATERBLOCK = 2
-AIRPOCKET = 3
-SOLIDAREA = 4
+UNCHANGED = 0
+WATERBLOCK = 1
+AIRPOCKET = 2
+SOLIDAREA = 3
+

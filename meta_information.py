@@ -1,14 +1,28 @@
+# Allows for udates inside the multiprocessing
+from multiprocessing import Value
+
+# TODO
+# Timing
+import time
+import datetime
+from time import gmtime, strftime
+
 from tkinter import StringVar, IntVar
 import queue
+
+import config as cfg
 
 class MetaInformation():
 
     def __init__(self):
+        self.algo_step = 0
+        self.algo_step_max = cfg.A_FINISHED
 
-        self.chunk_count = 0
+        self.chunk_count = Value('i', 0)
+        self.chunk_count_max = cfg.REGION_C_X * cfg.REGION_C_Z
+        self.label_count_max = Value('i', 0)
         self.file_count = 0
-        self.chunk_count_max = 0
-        self.file_count_max = 0
+        self.file_count_max = 1
 
         self.water_blocks = IntVar()
         self.air_pockets = IntVar()
@@ -22,8 +36,12 @@ class MetaInformation():
         self.repl_area.set("2")
 
         self.text_queue = queue.Queue()
+
+        self.start_ms = 0
+        self.end_ms = 0
         self.elapsed_time = 0
         self.estimated_time = 0
+        self.t_per_chunk = 0.5
 
         self.finished = True
 
@@ -43,3 +61,23 @@ class MetaInformation():
         self.target_dir = StringVar()
         self.target_dir.set(t_dir)
 
+    def update_estimated_time(self):
+        t_c = cfg.T_CLASSIFY * (0 if (self.algo_step > cfg.A_CLASSIFY) else 1)
+        t_i = cfg.T_IDENTIFY * (0 if (self.algo_step > cfg.A_IDENTIFY) else 1)
+        t_s = cfg.T_SAVE * (0 if (self.algo_step > cfg.A_SAVE) else 1)
+
+        chunks = self.chunk_count.value if self.algo_step >= cfg.A_MODIFY else 0
+        t_m = ((self.chunk_count_max - chunks) \
+            + (self.file_count_max - self.file_count - 1) * self.chunk_count_max) * self.t_per_chunk
+
+        self.estimated_time = (t_c + t_i + t_s) * (self.file_count_max - self.file_count) + t_m
+
+    def start_time(self):
+        self.start_ms = int(round(time.time() * 1000))
+
+    def end_time(self):
+        self.end_ms = int(round(time.time() * 1000))
+
+    def update_elapsed(self):
+        self.elapsed_time += (self.end_ms - self.start_ms) / 1000
+        self.t_per_chunk = self.elapsed_time / (self.chunk_count_max * self.file_count + self.chunk_count.value)

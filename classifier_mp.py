@@ -2,7 +2,6 @@
 import anvil
 
 # Multiprocessing
-import ctypes
 import itertools
 import multiprocessing as mp
 from contextlib import closing
@@ -12,25 +11,38 @@ import numpy as np
 
 # Own imports
 from block_tests import get_air_type, get_water_type, get_repl_type
+from mp_helper import MP_Helper
 import config as cfg
 
 class ClassifierMP:
 
-    def __init__(self):
-        self.jo = 0 # TODO delete
+    def __init__(self, meta_info):
+        # TODO dublicate with identifier
+        self.mp_helper = MP_Helper()
 
-    def init_shared(self, ncell):
-        '''Create shared value array for processing.'''
-        shared_array_base = mp.Array(ctypes.c_int, ncell, lock=False)
-        return(shared_array_base)
+    def classify_all_mp(self, region, chunk_count):
+        air_array_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
+        water_array_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
+        repl_array_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
 
-    def tonumpyarray(self, shared_array):
-        '''Create numpy array from shared memory.'''
-        nparray = np.frombuffer(shared_array, dtype = ctypes.c_int)
-        assert nparray.base is shared_array
-        return nparray
+        window_idxs = [(i, j) for i, j in
+                    itertools.product(range(0, cfg.REGION_C_X),
+                                        range(0, cfg.REGION_C_Z))]
 
-    def init_worker(self, air_array_shared_, water_array_shared_, repl_array_shared_, region_):
+        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (air_array_shared, water_array_shared, repl_array_shared, region, chunk_count))) as pool:
+            res = pool.map(self.worker_fun, window_idxs)
+
+        pool.close()
+        pool.join()
+
+        self.classified_air_region = self.mp_helper.tonumpyarray(air_array_shared)
+        self.classified_air_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+        self.classified_water_region = self.mp_helper.tonumpyarray(water_array_shared)
+        self.classified_water_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+        self.classified_repl_region = self.mp_helper.tonumpyarray(repl_array_shared)
+        self.classified_repl_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+
+    def init_worker(self, air_array_shared_, water_array_shared_, repl_array_shared_, region_, chunk_count_):
         '''Initialize worker for processing.
 
         Args:
@@ -40,11 +52,13 @@ class ClassifierMP:
         global water_array_shared
         global repl_array_shared
         global region
+        global chunk_count
 
-        air_array_shared = self.tonumpyarray(air_array_shared_)
-        water_array_shared = self.tonumpyarray(water_array_shared_)
-        repl_array_shared = self.tonumpyarray(repl_array_shared_)
+        air_array_shared = self.mp_helper.tonumpyarray(air_array_shared_)
+        water_array_shared = self.mp_helper.tonumpyarray(water_array_shared_)
+        repl_array_shared = self.mp_helper.tonumpyarray(repl_array_shared_)
         region = region_
+        chunk_count = chunk_count_
 
     # TODO rename
     def worker_fun(self, ix):
@@ -53,6 +67,8 @@ class ClassifierMP:
         water_array_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         repl_array_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         chunk_x, chunk_z = ix
+
+        chunk_count.value += 1
 
         try:
             chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
@@ -81,25 +97,3 @@ class ClassifierMP:
             if x == 15:
                 z = (z + 1) % 16
             x = (x + 1) % 16
-
-    def classify_all_mp(self, region):
-        air_array_shared = self.init_shared(cfg.REGION_B_TOTAL)
-        water_array_shared = self.init_shared(cfg.REGION_B_TOTAL)
-        repl_array_shared = self.init_shared(cfg.REGION_B_TOTAL)
-
-        window_idxs = [(i, j) for i, j in
-                    itertools.product(range(0, cfg.REGION_C_X),
-                                        range(0, cfg.REGION_C_Z))]
-
-        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (air_array_shared, water_array_shared, repl_array_shared, region))) as pool:
-            res = pool.map(self.worker_fun, window_idxs)
-
-        pool.close()
-        pool.join()
-
-        self.classified_air_region = self.tonumpyarray(air_array_shared)
-        self.classified_air_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-        self.classified_water_region = self.tonumpyarray(water_array_shared)
-        self.classified_water_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-        self.classified_repl_region = self.tonumpyarray(repl_array_shared)
-        self.classified_repl_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)

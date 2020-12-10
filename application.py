@@ -14,6 +14,8 @@ import os
 from modifier import Modifier
 from meta_information import MetaInformation
 
+import config as cfg
+
 PAD_X = 20
 PAD_Y = (10, 0)
 
@@ -34,7 +36,7 @@ class MainApp():
         self.init_details(window)
 
         self.run_button = Button(window, text="Dew it", command=lambda: self.run(window))
-        self.run_button.grid(row=14, column=0, padx = PAD_X, pady = 10)
+        self.run_button.grid(row=16, column=0, padx = PAD_X, pady = 10)
 
     def run(self, window):
         if not self.meta_info.finished:
@@ -50,13 +52,17 @@ class MainApp():
 
     def listen_for_result(self, window):
         # TODO setting the maximum here is not optimal but its better than doing it in the modifier
-        c_count = self.meta_info.chunk_count
-        c_count_max = self.meta_info.chunk_count_max
+        c_count = self.meta_info.chunk_count.value
+        c_count_max = self.meta_info.chunk_count_max if self.meta_info.algo_step != cfg.A_IDENTIFY else self.meta_info.label_count_max.value
         f_count = self.meta_info.file_count
         f_count_max = self.meta_info.file_count_max
         self.chunk_progress["value"] = c_count
         self.chunk_progress["maximum"] = c_count_max
         self.chunk_progress.update()
+
+        self.algo_progress["value"] = self.meta_info.algo_step
+        self.algo_progress["maximum"] = self.meta_info.algo_step_max
+        self.algo_progress.update()
 
         self.file_progress["value"] = f_count
         self.file_progress["maximum"] = f_count_max
@@ -67,6 +73,7 @@ class MainApp():
 
         if self.meta_info.finished:
             self.chunk_label.config(text=f"Finished all chunks of {c_count_max} chunks.")
+            self.algo_label.config(text=f"Finished all {self.meta_info.algo_step_max} steps.")
             self.file_label.config(text=f"Finished all files of {f_count_max} files.")
             self.time_label.config(text=f"Done.")
 
@@ -74,22 +81,25 @@ class MainApp():
             while not self.meta_info.text_queue.empty():
                 self.details_text.insert(END, self.meta_info.text_queue.get(0))
         else:
-            max_chunk = int(math.sqrt(c_count_max))
-            c_x = int(c_count % 32)
-            c_z = int(c_count / 32)
+            c_x = int(c_count % cfg.REGION_C_Z)
+            c_z = int(c_count / cfg.REGION_C_Z)
 
+            self.meta_info.update_estimated_time()
             s = int(self.meta_info.estimated_time % 60)
             m = int(self.meta_info.estimated_time / 60)
             self.time_label.config(text=f"Processing Data. Estimated rest time: {m} minutes and {s} seconds.")
 
-            # TODO hmmm
-            if c_count == c_count_max:
-                c_x = max_chunk - 1
-                c_z = max_chunk - 1
-                self.time_label.config(text=f"Writing File. Estimated rest time: 5 minutes.")
+            if self.meta_info.algo_step == cfg.A_SAVE:
+                c_x = cfg.REGION_C_X - 1
+                c_z = cfg.REGION_C_Z - 1
+                self.time_label.config(text=f"Writing File. Estimated rest time: 3 minutes.")
 
-            self.chunk_label.config(
-                text=f"Finished chunk ({c_x}, {c_z}) of ({max_chunk - 1}, {max_chunk - 1}). And {c_count} of {c_count_max} chunks.")
+            if self.meta_info.algo_step != cfg.A_IDENTIFY:
+                self.chunk_label.config(
+                    text=f"Finished chunk ({c_x}, {c_z}) of ({cfg.REGION_C_X - 1}, {cfg.REGION_C_Z - 1}). And {c_count} of {c_count_max} chunks.")
+            else:
+                self.chunk_label.config(text=f"Finished {c_count} of {c_count_max} elements.")
+            self.algo_label.config(text=f"Finished {self.meta_info.algo_step} out of {self.meta_info.algo_step_max} steps.")
             self.file_label.config(text=f"Finished file {f_count} of {f_count_max} files.")
             window.after(50, lambda: self.listen_for_result(window))
 
@@ -143,25 +153,33 @@ class MainApp():
     def init_progressindicator(self, window):
         # Update to get the correct width for the progressbar
         window.update()
+        w_width = window.winfo_width()
         # Progress bar widget
-        self.chunk_progress = Progressbar(window, orient = HORIZONTAL, length = window.winfo_width(), mode = 'determinate')
+        self.chunk_progress = Progressbar(window, orient = HORIZONTAL, length = w_width, mode = 'determinate')
         self.chunk_progress["value"] = 0
         self.chunk_progress.update()
         self.chunk_progress.grid(row=9, sticky=W, padx = PAD_X, pady = 10)
 
-        self.file_progress = Progressbar(window, orient = HORIZONTAL, length = window.winfo_width(), mode = 'determinate')
+        self.algo_progress = Progressbar(window, orient = HORIZONTAL, length = w_width, mode = 'determinate')
+        self.algo_progress["value"] = 0
+        self.algo_progress.update()
+        self.algo_progress.grid(row=11, sticky=W, padx = PAD_X, pady = 10)
+
+        self.file_progress = Progressbar(window, orient = HORIZONTAL, length = w_width, mode = 'determinate')
         self.file_progress["value"] = 0
         self.file_progress.update()
-        self.file_progress.grid(row=11, sticky=W, padx = PAD_X, pady = 10)
+        self.file_progress.grid(row=13, sticky=W, padx = PAD_X, pady = 10)
 
         # Progress label
         self.chunk_label = Label(window, text="Program is not yet running!")
         self.chunk_label.grid(row=10, sticky=E, padx = PAD_X)
+        self.algo_label = Label(window, text="Program is not yet running!")
+        self.algo_label.grid(row=12, sticky=E, padx = PAD_X)
         self.file_label = Label(window, text="Program is not yet running!")
-        self.file_label.grid(row=12, sticky=E, padx = PAD_X)
+        self.file_label.grid(row=14, sticky=E, padx = PAD_X)
 
         self.time_label = Label(window, text="")
-        self.time_label.grid(row=13, sticky=E, padx = PAD_X)
+        self.time_label.grid(row=15, sticky=E, padx = PAD_X)
 
     def init_details(self, window):
         # Create details button
@@ -169,14 +187,14 @@ class MainApp():
             if helper_frame.hidden:
                 helper_frame.grid()
                 helper_frame.hidden = False
-                self.run_button.grid(row=15)
+                self.run_button.grid(row=17)
             else:
                 helper_frame.grid_remove()
                 helper_frame.hidden = True
-                self.run_button.grid(row=14)
+                self.run_button.grid(row=16)
 
         details_button = Button(window, text="Details", command=details)
-        details_button.grid(row=13, column=0, sticky=W, padx = PAD_X)
+        details_button.grid(row=15, column=0, sticky=W, padx = PAD_X)
 
         # Details Menu
         helper_frame = Frame(window, width=window.winfo_width() - PAD_X * 2, height=100)
@@ -186,7 +204,7 @@ class MainApp():
         details_scroll.pack(side=RIGHT, fill=Y)
         self.details_text.configure(yscrollcommand=details_scroll.set)
         self.details_text.pack(fill="both", expand=True)
-        helper_frame.grid(row=14, column=0, padx = PAD_X, pady = 10)
+        helper_frame.grid(row=16, column=0, padx = PAD_X, pady = 10)
         helper_frame.grid_remove()
         helper_frame.hidden = True
 

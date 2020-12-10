@@ -31,14 +31,117 @@ class Modifier():
     def __init__(self, meta_info):
         self.meta_info = meta_info
 
-        # TODO
-        self.changeCountWater = 0
-        self.changeCountAir = 0
-        self.changeCountRepl = 0
+        self.identifier = Identifier(self.meta_info)
 
     ###############################################################################################
-    # Copy
+
+    def copyRegion(self, filename):
+        l = filename.split('.')
+        rX = int(l[1])
+        rZ = int(l[2])
+
+        # Create a new region with the `EmptyRegion` class at region coords
+        newRegion = anvil.EmptyRegion(rX, rZ)
+        src_dir = self.meta_info.source_dir.get()
+        region = anvil.Region.from_file(src_dir + "/" + filename)
+
+        replRegion = False
+        if self.repl_blocks:
+            try:
+                repl_dir = self.meta_info.replacement_dir.get()
+                replRegion = anvil.Region.from_file(repl_dir + "/" + filename)
+            except:
+                print(f'Could not create replacement region for {filename}.')
+
+        ##########################################
+        # Main function call
+        ##########################################
+        self.copy_chunks(newRegion, region, replRegion)
+
+        # TODO changeCountAir
+        if self.water_blocks + self.air_pockets + self.repl_blocks >= 1:
+            self.meta_info.text_queue.put(f'In file {filename}:\n')
+        if self.water_blocks == 1:
+            self.meta_info.text_queue.put(f'Changed {self.identifier.change_count_water} solid blocks to water.\n')
+        if self.air_pockets == 1:
+            self.meta_info.text_queue.put(f'Changed {self.identifier.change_count_air} air blocks to solid blocks.\n')
+        if self.repl_blocks == 1:
+            self.meta_info.text_queue.put(f'Changed {self.identifier.change_count_repl} solid blocks to replacement solid blocks.\n')
+
+        ms = int(round(time.time() * 1000))
+
+        # Save to a file
+        self.meta_info.algo_step = cfg.A_SAVE
+        target_dir = self.meta_info.target_dir.get()
+        newRegion.save(target_dir + "/" + filename)
+        self.meta_info.algo_step = cfg.A_FINISHED
+
+        ms2 = int(round(time.time() * 1000))
+        print(f"Save time: {ms2 - ms}")
+
     ###############################################################################################
+
+    def copy_chunks(self, newRegion, region, replRegion):
+        ms = int(round(time.time() * 1000))
+
+        # TODO combine these into a function?
+        self.meta_info.algo_step = cfg.A_CLASSIFY
+        self.meta_info.chunk_count.value = 0
+        classifier_mp = ClassifierMP(self.meta_info)
+        classifier_mp.classify_all_mp(region, self.meta_info.chunk_count)
+
+        ms2 = int(round(time.time() * 1000))
+        print(f"Classifier time: {ms2 - ms}")
+
+        self.meta_info.algo_step = cfg.A_IDENTIFY
+        self.identifier.identify(
+            classifier_mp.classified_air_region,
+            classifier_mp.classified_water_region,
+            classifier_mp.classified_repl_region,
+            self.meta_info.chunk_count,
+            self.meta_info.label_count_max
+        )
+
+        ms3 = int(round(time.time() * 1000))
+        print(f"Identifier time: {ms3 - ms2}")
+
+        self.meta_info.algo_step = cfg.A_MODIFY
+        self.meta_info.chunk_count.value = 0
+        for chunk_x in range(cfg.REGION_C_X):
+
+            self.meta_info.start_time()
+            for chunk_z in range(cfg.REGION_C_Z):
+                self.copy_chunk(newRegion, region, replRegion, chunk_x, chunk_z)
+                self.meta_info.chunk_count.value += 1
+
+            self.meta_info.end_time()
+            self.meta_info.update_elapsed()
+
+        ms4 = int(round(time.time() * 1000))
+        print(f"Modify time: {ms4 - ms3}")
+
+    ###############################################################################################
+
+    def copy_chunk(self, new_region, region, repl_region, chunk_x, chunk_z):
+        chunk = None
+        try:
+            chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
+        except:
+            print(f'skipped non-existent chunk ({chunk_x},{chunk_z})')
+
+        if chunk:
+            # TODO only when the option is ticked?
+            repl_chunk = False
+            if repl_region:
+                try:
+                    repl_chunk = anvil.Chunk.from_region(repl_region, chunk_x, chunk_z)
+                except:
+                    print(f'Could not create replacement chunk for {chunk_x}, {chunk_z}.')
+
+            self.modify(chunk, repl_chunk, new_region, chunk_x, chunk_z)
+
+    ###############################################################################################
+
     def modify(self, chunk, replChunk, newRegion, chunk_x, chunk_z):
         newChunk = 0
         x = 0
@@ -56,10 +159,10 @@ class Modifier():
         for block in chunk.stream_chunk():
             b = block
 
-            x_region = chunk_x * 16 + x
-            z_region = chunk_z * 16 + z
-            x_global = newRegion.x * 512 + x_region
-            z_global = newRegion.z * 512 + z_region
+            x_region = chunk_x * cfg.CHUNK_B_X + x
+            z_region = chunk_z * cfg.CHUNK_B_Z + z
+            x_global = newRegion.x * cfg.REGION_B_X + x_region
+            z_global = newRegion.z * cfg.REGION_B_Z + z_region
 
             xyz = self.identifier.identified[x_region, y, z_region]
             if xyz == cfg.WATERBLOCK:
@@ -85,10 +188,7 @@ class Modifier():
                         b = newBlock
                     # TODO debug version
                     b = diamond_block
-            # elif xyz == UNCHECKED:
-            #     print(f'Found unchecked Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunk_z}), this should not happen')
-                #print(f'GlobalPos: ({newRegion.x * 512 + chunk_x * 16 + x}, {y}, {newRegion.z * 512 + chunk_z * 16 + z})')
-            elif xyz != cfg.UNCHANGED2:
+            elif xyz != cfg.UNCHANGED:
                 print(f'Found unidentified Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunchunk_zkZ}) with {xyz}, this should not happen')
                 print(f'GlobalPos: ({x_global}, {y}, {z_global})')
 
@@ -97,6 +197,7 @@ class Modifier():
             except:
                 print(f'could not set Block ({x},{y},{z})')
 
+            # TODO
             if z == 15 and x == 15:
                 y += 1
             if x == 15:
@@ -104,122 +205,6 @@ class Modifier():
             x = (x + 1) % 16
 
         newChunk.set_data(chunk.data)
-
-    ###############################################################################################
-
-    def copy_chunk(self, new_region, region, repl_region, chunk_x, chunk_z):
-        chunk = None
-        try:
-            chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
-        except:
-            print(f'skipped non-existent chunk ({chunk_x},{chunk_z})')
-
-        if chunk:
-            # TODO only when the option is ticked?
-            repl_chunk = False
-            if repl_region:
-                try:
-                    repl_chunk = anvil.Chunk.from_region(repl_region, chunk_x, chunk_z)
-                except:
-                    print(f'Could not create replacement chunk for {chunk_x}, {chunk_z}.')
-
-            self.modify(chunk, repl_chunk, new_region, chunk_x, chunk_z)
-
-    ###############################################################################################
-
-    def copy_chunks(self, newRegion, region, replRegion):
-        ms = int(round(time.time() * 1000))
-
-        classifier_mp = ClassifierMP()
-        classifier_mp.classify_all_mp(region)
-        # TODO does the modifier need this?
-        self.classified_air_region = classifier_mp.classified_air_region
-        self.classified_water_region = classifier_mp.classified_water_region
-        self.classified_repl_region = classifier_mp.classified_repl_region
-
-        ms2 = int(round(time.time() * 1000))
-        print(f"Classifier time: {ms2 - ms}")
-
-        self.identifier = Identifier(self.meta_info, True)
-        # TODO names and delete the counts here
-        self.changeCountWater, self.changeCountAir, self.changeCountRepl = self.identifier.identify(self.classified_air_region, self.classified_water_region, self.classified_repl_region)
-
-        ms3 = int(round(time.time() * 1000))
-        print(f"Identifier time: {ms3 - ms2}")
-
-        for chunk_x in range(cfg.REGION_C_X):
-        # for chunk_x in range(10, 12):
-
-            ms = int(round(time.time() * 1000))
-            for chunk_z in range(cfg.REGION_C_Z):
-            # for chunk_z in range(11, 16):
-                self.copy_chunk(newRegion, region, replRegion, chunk_x, chunk_z)
-                self.meta_info.chunk_count = chunk_z + 1 + chunk_x * cfg.REGION_C_Z
-
-            ms2 = int(round(time.time() * 1000))
-            self.meta_info.elapsed_time += (ms2 - ms) / 1000
-            t_per_chunk = self.meta_info.elapsed_time / (self.meta_info.chunk_count_max * self.meta_info.file_count + self.meta_info.chunk_count)
-            self.meta_info.estimated_time = ((self.meta_info.chunk_count_max - self.meta_info.chunk_count) \
-                + (self.meta_info.file_count_max - self.meta_info.file_count - 1) * self.meta_info.chunk_count_max) * t_per_chunk
-
-        ms4 = int(round(time.time() * 1000))
-        print(f"Modify time: {ms4 - ms3}")
-
-    ###############################################################################################
-
-    def copyRegion(self, filename):
-        l = filename.split('.')
-        rX = int(l[1])
-        rZ = int(l[2])
-
-        ms = int(round(time.time() * 1000))
-
-        # Create a new region with the `EmptyRegion` class at region coords
-        newRegion = anvil.EmptyRegion(rX, rZ)
-        src_dir = self.meta_info.source_dir.get()
-        region = anvil.Region.from_file(src_dir + "/" + filename)
-
-        replRegion = False
-        if self.repl_blocks:
-            try:
-                repl_dir = self.meta_info.replacement_dir.get()
-                replRegion = anvil.Region.from_file(repl_dir + "/" + filename)
-            except:
-                print(f'Could not create replacement region for {filename}.')
-
-        ms2 = int(round(time.time() * 1000))
-        print(f"Setup regions time: {ms2 - ms}")
-
-        # TODO use config file
-        self.meta_info.chunk_count = 0
-        self.meta_info.chunk_count_max = cfg.REGION_C_X * cfg.REGION_C_Z
-        # TODO calculation not correct anymore
-        self.meta_info.estimated_time = self.meta_info.chunk_count_max * self.meta_info.file_count_max
-
-##########################################
-
-        self.copy_chunks(newRegion, region, replRegion)
-
-##########################################
-
-        # TODO changeCountAir is not reset
-        if self.water_blocks + self.air_pockets + self.repl_blocks >= 1:
-            self.meta_info.text_queue.put(f'In file {filename}:\n')
-        if self.water_blocks == 1:
-            self.meta_info.text_queue.put(f'Changed {self.changeCountWater} solid blocks to water.\n')
-        if self.air_pockets == 1:
-            self.meta_info.text_queue.put(f'Changed {self.changeCountAir} air blocks to solid blocks.\n')
-        if self.repl_blocks == 1:
-            self.meta_info.text_queue.put(f'Changed {self.changeCountRepl} solid blocks to replacement solid blocks.\n')
-
-        ms = int(round(time.time() * 1000))
-
-        # Save to a file
-        target_dir = self.meta_info.target_dir.get()
-        newRegion.save(target_dir + "/" + filename)
-
-        ms2 = int(round(time.time() * 1000))
-        print(f"Save time: {ms2 - ms}")
 
 ###################################################################################################
 # Main
@@ -247,7 +232,7 @@ class Modifier():
         else:
             self.meta_info.text_queue.put("Water Blocks will not be fixed!\n")
 
-        if (self.air_pockets  == 1):
+        if (self.air_pockets == 1):
             self.meta_info.text_queue.put("Air Blocks will be fixed!\n")
         else:
             self.meta_info.text_queue.put("Air Blocks will not be fixed!\n")

@@ -3,7 +3,6 @@ import numpy as np
 # Multiprocessing
 import ctypes
 import multiprocessing as mp
-from contextlib import closing
 
 class MP_Helper:
 
