@@ -141,8 +141,8 @@ class Modifier():
         print(f"Classifier time: {ms2 - ms}")
 
         self.identifier = Identifier(self.meta_info, True)
-        # TODO names
-        self.changeCountWater, self.changeCountAir, self.changeCountRepl = self.identifier.identify_label(self.classified_air_region, self.classified_water_region, self.classified_repl_region)
+        # TODO names and delete the counts here
+        self.changeCountWater, self.changeCountAir, self.changeCountRepl = self.identifier.identify(self.classified_air_region, self.classified_water_region, self.classified_repl_region)
 
         ms3 = int(round(time.time() * 1000))
         print(f"Identifier time: {ms3 - ms2}")
