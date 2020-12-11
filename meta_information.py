@@ -18,12 +18,12 @@ class MetaInformation():
         self.algo_step = 0
         self.algo_step_max = cfg.A_FINISHED
 
-        self.chunk_count = Value('i', 0)
-        self.chunk_count_max = cfg.REGION_C_X * cfg.REGION_C_Z
-        self.label_count_max = Value('i', 0)
+        self.counts = Counts()
+
         self.file_count = 0
         self.file_count_max = 1
 
+        # TODO dont save these as tkinter objects but only set them at application start
         self.water_blocks = IntVar()
         self.air_pockets = IntVar()
         self.repl_blocks = IntVar()
@@ -66,9 +66,9 @@ class MetaInformation():
         t_i = cfg.T_IDENTIFY * (0 if (self.algo_step > cfg.A_IDENTIFY) else 1)
         t_s = cfg.T_SAVE * (0 if (self.algo_step > cfg.A_SAVE) else 1)
 
-        chunks = self.chunk_count.value if self.algo_step >= cfg.A_MODIFY else 0
-        t_m = ((self.chunk_count_max - chunks) \
-            + (self.file_count_max - self.file_count - 1) * self.chunk_count_max) * self.t_per_chunk
+        chunks = self.counts.chunks.value if self.algo_step >= cfg.A_MODIFY else 0
+        t_m = ((self.counts.chunk_max - chunks) \
+            + (self.file_count_max - self.file_count - 1) * self.counts.chunk_max) * self.t_per_chunk
 
         self.estimated_time = (t_c + t_i + t_s) * (self.file_count_max - self.file_count) + t_m
 
@@ -80,4 +80,20 @@ class MetaInformation():
 
     def update_elapsed(self):
         self.elapsed_time += (self.end_ms - self.start_ms) / 1000
-        self.t_per_chunk = self.elapsed_time / (self.chunk_count_max * self.file_count + self.chunk_count.value)
+        self.t_per_chunk = self.elapsed_time / (self.counts.chunk_max * self.file_count + self.counts.chunks.value)
+
+class Counts():
+
+    def __init__(self):
+        self.algo_step = 0
+        self.algo_step_max = cfg.A_FINISHED
+
+        self.chunks = Value('i', 0)
+        self.chunk_max = cfg.REGION_C_X * cfg.REGION_C_Z
+        self.label_max = Value('i', 0)
+        self.file_count = 0
+        self.file_count_max = 1
+
+        self.changed_air = Value('i', 0)
+        self.changed_water = Value('i', 0)
+        self.changed_repl = Value('i', 0)

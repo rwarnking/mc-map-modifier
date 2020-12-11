@@ -29,7 +29,6 @@ class Identifier:
         self.repl_blocks = meta_info.repl_blocks.get()
 
         self.change_count_water = 0
-        self.change_count_air = 0
         self.change_count_repl = 0
 
         # TODO
@@ -38,42 +37,38 @@ class Identifier:
     ###############################################################################################
 
     # TODO np.savetxt('data2.csv', arr[1], fmt='%i', delimiter=',')
-    # TODO each array does add approx 20 secounds to the classify process
     # times
     # classify: 64048 - 86219
     # identify: 62331 - 74528
     # modify: 476081
     # save: 208582
     # total: 814072 upto 900000
-    def identify(self, classified_air_region, classified_water_region, classified_repl_region, label_count, label_count_max):
-        self.label_air_mp(classified_air_region, label_count, label_count_max)
-        # TODO the problem is, that the blocks are first replaced with water but
-        # afterwards replaced again due to the relacementtest
-        # for smaller sizes this should be fixed by the tickness test, but for bigger pockets
-        # it is recommended to first do the replace and afterwards do the waterblocks
-        self.label_water(classified_water_region, label_count, label_count_max)
-        self.label_repl(classified_repl_region, label_count, label_count_max)
-
-        return [self.change_count_water, self.change_count_air, self.change_count_repl]
+    def identify(self, classified_air_region, classified_water_region, classified_repl_region, counts):
+        self.label_air(classified_air_region, counts)
+        self.label_repl(classified_repl_region, counts)
+        # Do the water replacement after the block replacement to prevent changes of
+        # water pockets due to replacement
+        self.label_water(classified_water_region, counts)
 
     ###############################################################################################
 
-    def label_air_mp(self, classified_air_region, label_count, label_count_max):
+    def label_air(self, classified_air_region, counts):
         arr1, num1 = label2(classified_air_region, np.ones((3, 3, 3)))
         # TODO check for amount of label and then parallelise if needed
+
         # TODO unnecessary elements are tested: [i for i in range(1, 82, 20)] => [1, 21, 41, 61, 81]
         # 81 upto 101 are tested even if 82 is the max
         # TODO 20 as variable inside the process
         process_elem = 20
 
-        label_count.value = 0
-        label_count_max.value = num1 # last label count = 487
+        counts.chunks.value = 0
+        counts.label_max.value = num1 # last label count = 487
 
         identified_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
 
         window_idxs = [i for i in range(1, num1 + 1, process_elem)]
 
-        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (identified_shared, classified_air_region, arr1, label_count))) as pool:
+        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (identified_shared, classified_air_region, arr1, counts))) as pool:
             res = pool.map(self.worker_fun, window_idxs)
 
         pool.close()
@@ -84,11 +79,11 @@ class Identifier:
 
     ###############################################################################################
 
-    def label_water(self, classified_water_region, label_count, label_count_max):
+    def label_water(self, classified_water_region, counts):
         # TODO it seems like two blocks above each other are not correctly identified
         arr2, num2 = label(classified_water_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
-        label_count.value = 0
-        label_count_max.value = num2 # last label count = 9
+        counts.chunks.value = 0
+        counts.label_max.value = num2 # last label count = 9
 
         for idx in range(1, num2 + 1):
             result = np.nonzero(arr2 == idx)
@@ -96,16 +91,16 @@ class Identifier:
 
             if lenght <= self.wp_size:
                 self.fill_array(self.identified, result, cfg.WATERBLOCK)
-                self.change_count_water += lenght
-            label_count.value += 1
+                counts.changed_water.value += lenght
+            counts.chunks.value += 1
 
     ###############################################################################################
 
-    def label_repl(self, classified_repl_region, label_count, label_count_max):
+    def label_repl(self, classified_repl_region, counts):
         classified_repl_region = ndimage.binary_erosion(classified_repl_region, structure=np.ones((self.repl_area, self.repl_area, self.repl_area))).astype(classified_repl_region.dtype)
         arr3, num3 = label(classified_repl_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
-        label_count.value = 0
-        label_count_max.value = num3  # last label count = 16 for repl_area = 5
+        counts.chunks.value = 0
+        counts.label_max.value = num3  # last label count = 16 for repl_area = 5
 
         for idx in range(1, num3 + 1):
             result = np.nonzero(arr3 == idx)
@@ -113,9 +108,9 @@ class Identifier:
 
             # if self.repl_blocks == 1: # TODO
             self.fill_array(self.identified, result, cfg.SOLIDAREA)
-            self.change_count_repl += lenght
+            counts.changed_repl.value += lenght
 
-            label_count.value += 1
+            counts.chunks.value += 1
 
     ###############################################################################################
 
@@ -146,7 +141,7 @@ class Identifier:
 
 
     # TODO combine with classifier mp
-    def init_worker(self, identified_shared_, classified_air_region_, arr1_, label_count_):
+    def init_worker(self, identified_shared_, classified_air_region_, arr1_, counts_):
         '''Initialize worker for processing.
 
         Args:
@@ -157,12 +152,12 @@ class Identifier:
         global identified_shared
         global classified_air_region
         global arr1
-        global label_count
+        global counts
 
         identified_shared = self.mp_helper.tonumpyarray(identified_shared_)
         classified_air_region = classified_air_region_
         arr1 = arr1_
-        label_count = label_count_
+        counts = counts_
 
     # TODO rename
     def worker_fun(self, ix):
@@ -177,6 +172,6 @@ class Identifier:
 
             if lenght <= self.apocket_size and self.check_all(classified_air_region, result, cfg.G_AIR):
                 self.fill_array(identified_shared, result, cfg.AIRPOCKET)
-                self.change_count_air += lenght
+                counts.changed_air.value += lenght
 
-            label_count.value += 1
+            counts.chunks.value += 1

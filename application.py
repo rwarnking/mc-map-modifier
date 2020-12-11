@@ -52,8 +52,8 @@ class MainApp():
 
     def listen_for_result(self, window):
         # TODO setting the maximum here is not optimal but its better than doing it in the modifier
-        c_count = self.meta_info.chunk_count.value
-        c_count_max = self.meta_info.chunk_count_max if self.meta_info.algo_step != cfg.A_IDENTIFY else self.meta_info.label_count_max.value
+        c_count = self.meta_info.counts.chunks.value
+        c_count_max = self.meta_info.counts.chunk_max if self.meta_info.algo_step != cfg.A_IDENTIFY else self.meta_info.counts.label_max.value
         f_count = self.meta_info.file_count
         f_count_max = self.meta_info.file_count_max
         self.chunk_progress["value"] = c_count
@@ -133,8 +133,8 @@ class MainApp():
 
     def init_checkbuttons(self, window):
         # Create checkboxes
-        Checkbutton(window, text="Fix pockets in water.", variable=self.meta_info.water_blocks).grid(row=6, sticky=W, padx = PAD_X)
-        Checkbutton(window, text="Fix air pockets.", variable=self.meta_info.air_pockets).grid(row=7, sticky=W, padx = PAD_X)
+        Checkbutton(window, text="Fix air pockets.", variable=self.meta_info.air_pockets).grid(row=6, sticky=W, padx = PAD_X)
+        Checkbutton(window, text="Fix pockets in water.", variable=self.meta_info.water_blocks).grid(row=7, sticky=W, padx = PAD_X)
         Checkbutton(window, text="Use replacement blocks from other map.", variable=self.meta_info.repl_blocks).grid(row=8, sticky=W, padx = PAD_X)
 
         # TODO give option to select block amount
@@ -144,9 +144,9 @@ class MainApp():
         e_pad_x = (0, 20)
         l_pad_x = (0, 20 + 2 * 10)
         Label(window, text="Num blocks: ").grid(row=6, sticky=E, padx = l_pad_x)
-        Entry(window, textvariable=self.meta_info.wpocket_size, width=2, validate='all', validatecommand=(vcmd, '%P')).grid(row=6, sticky=E, padx=e_pad_x)
+        Entry(window, textvariable=self.meta_info.apocket_size, width=2, validate='all', validatecommand=(vcmd, '%P')).grid(row=6, sticky=E, padx=e_pad_x)
         Label(window, text="Num blocks: ").grid(row=7, sticky=E, padx = l_pad_x)
-        Entry(window, textvariable=self.meta_info.apocket_size, width=2, validate='all', validatecommand=(vcmd, '%P')).grid(row=7, sticky=E, padx=e_pad_x)
+        Entry(window, textvariable=self.meta_info.wpocket_size, width=2, validate='all', validatecommand=(vcmd, '%P')).grid(row=7, sticky=E, padx=e_pad_x)
         Label(window, text="Neighbourhood: ").grid(row=8, sticky=E, padx = l_pad_x)
         Entry(window, textvariable=self.meta_info.repl_area, width=2, validate='all', validatecommand=(vcmd, '%P')).grid(row=8, sticky=E, padx=e_pad_x)
 
