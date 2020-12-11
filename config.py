@@ -35,9 +35,19 @@ G_WATER = 2
 G_SOLID = 3
 G_TRANSPARENT = 4
 
+# Classifier array indices and total amount of arrays used
+C_A_AIR = 0
+C_A_WATER = 1
+C_A_REPL = 2
+C_A_COUNT = 3
+
 # Identifier types
 UNCHANGED = 0
 WATERBLOCK = 1
 AIRPOCKET = 2
 SOLIDAREA = 3
 
+# For multiprocessing
+# How many elements one process should operate on
+# TODO should this be calculated?
+I_PROCESS_ELEM = 20

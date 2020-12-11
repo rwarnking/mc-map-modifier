@@ -21,51 +21,46 @@ class ClassifierMP:
         self.mp_helper = MP_Helper()
 
     def classify_all_mp(self, region, chunk_count):
-        air_array_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
-        water_array_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
-        repl_array_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
 
+        # Create a list of shared arrays that have the specified size
+        shared_arrays = [self.mp_helper.init_shared(cfg.REGION_B_TOTAL) for x in range(cfg.C_A_COUNT)]
+
+        # Create pairs to index the different chunks -> (0, 0) (0, 1) (0, m) (1, 0) (2, 0) (n, m)
         window_idxs = [(i, j) for i, j in
                     itertools.product(range(0, cfg.REGION_C_X),
                                         range(0, cfg.REGION_C_Z))]
 
-        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (air_array_shared, water_array_shared, repl_array_shared, region, chunk_count))) as pool:
-            res = pool.map(self.worker_fun, window_idxs)
+        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (shared_arrays, region, chunk_count))) as pool:
+            res = pool.map(self.worker_task, window_idxs)
 
         pool.close()
         pool.join()
 
-        self.classified_air_region = self.mp_helper.tonumpyarray(air_array_shared)
+        self.classified_air_region = self.mp_helper.tonumpyarray(shared_arrays[cfg.C_A_AIR])
         self.classified_air_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-        self.classified_water_region = self.mp_helper.tonumpyarray(water_array_shared)
+        self.classified_water_region = self.mp_helper.tonumpyarray(shared_arrays[cfg.C_A_WATER])
         self.classified_water_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-        self.classified_repl_region = self.mp_helper.tonumpyarray(repl_array_shared)
+        self.classified_repl_region = self.mp_helper.tonumpyarray(shared_arrays[cfg.C_A_REPL])
         self.classified_repl_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
 
-    def init_worker(self, air_array_shared_, water_array_shared_, repl_array_shared_, region_, chunk_count_):
+    def init_worker(self, shared_arrays_, region_, chunk_count_):
         '''Initialize worker for processing.
 
         Args:
             shared_array_: Object returned by init_shared
         '''
-        global air_array_shared
-        global water_array_shared
-        global repl_array_shared
+        global shared_arrays
         global region
         global chunk_count
 
-        air_array_shared = self.mp_helper.tonumpyarray(air_array_shared_)
-        water_array_shared = self.mp_helper.tonumpyarray(water_array_shared_)
-        repl_array_shared = self.mp_helper.tonumpyarray(repl_array_shared_)
+        shared_arrays = [self.mp_helper.tonumpyarray(array) for array in shared_arrays_]
         region = region_
         chunk_count = chunk_count_
 
-    # TODO rename
-    def worker_fun(self, ix):
+    def worker_task(self, ix):
         '''Function to be run inside each worker'''
-        air_array_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-        water_array_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-        repl_array_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+        for array in shared_arrays:
+            array.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         chunk_x, chunk_z = ix
 
         chunk_count.value += 1
@@ -87,9 +82,9 @@ class ClassifierMP:
         for block in chunk.stream_chunk():
             r_x = x + chunk_b_x * chunk_x
             r_z = z + chunk_b_z * chunk_z
-            air_array_shared[r_x, y, r_z] = get_air_type(block.id)
-            water_array_shared[r_x, y, r_z] = get_water_type(block.id)
-            repl_array_shared[r_x, y, r_z] = get_repl_type(block.id)
+            shared_arrays[cfg.C_A_AIR][r_x, y, r_z] = get_air_type(block.id)
+            shared_arrays[cfg.C_A_WATER][r_x, y, r_z] = get_water_type(block.id)
+            shared_arrays[cfg.C_A_REPL][r_x, y, r_z] = get_repl_type(block.id)
 
             # TODO chunk_b_x
             if z == 15 and x == 15:
