@@ -48,6 +48,4 @@ AIRPOCKET = 2
 SOLIDAREA = 3
 
 # For multiprocessing
-# How many elements one process should operate on
-# TODO should this be calculated?
-I_PROCESS_ELEM = 20
+PROCESSES = 4
