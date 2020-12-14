@@ -11,7 +11,7 @@ import threading
 import os
 
 # own imports
-from modifier import Modifier
+from copier import Copier
 from meta_information import MetaInformation
 
 import config as cfg
@@ -44,9 +44,9 @@ class MainApp():
             window.after(50, lambda: self.listen_for_result(window))
             return
 
-        m = Modifier(self.meta_info)
+        c = Copier(self.meta_info)
         self.meta_info.finished = False
-        self.new_thread = threading.Thread(target=m.run)
+        self.new_thread = threading.Thread(target=c.run)
         self.new_thread.start()
         window.after(50, lambda: self.listen_for_result(window))
 
