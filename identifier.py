@@ -59,60 +59,121 @@ class Identifier:
     ###############################################################################################
     # Labeling functions
     ###############################################################################################
-    def label_air(self, identified_shared, classified_air_region, counts):
-        labeled, num = label2(classified_air_region, np.ones((3, 3, 3)))
+    def label_air(self, identified_shared, c_region, counts):
+        # TODO make labeled and num self?
+        labeled, num = label2(c_region, np.ones((3, 3, 3)))
         counts.chunks.value = 0
         counts.label_max.value = num # last label count = 487
 
+        self.filler = cfg.AIRPOCKET
+
         # Check for label-amount and use multiprocessing if needed
         if num < cfg.PROCESSES * 5:
-            validator = lambda l, r: l <= self.apocket_size and self.check_all(classified_air_region, r, cfg.G_AIR)
-            self.fill_labels_sp(labeled, num, classified_air_region, cfg.AIRPOCKET, counts, counts.changed_air, validator)
+            validator = lambda l, r: l <= self.apocket_size and self.check_all(c_region, r, cfg.G_AIR)
+            self.fill_labels_sp(labeled, num, c_region, counts, counts.changed_air, validator, self.identified)
         else:
-            self.fill_labels_mp(labeled, num, classified_air_region, identified_shared, counts)
+            self.fill_labels_mp(labeled, num, c_region, identified_shared, counts, counts.changed_air, 1)
 
-    def label_water(self, identified_shared, classified_water_region, counts):
-        labeled, num = label(classified_water_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
+    def label_water(self, identified_shared, c_region, counts):
+        labeled, num = label(c_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
         counts.chunks.value = 0
         counts.label_max.value = num # last label count = 9
 
-        validator = lambda l, r: l <= self.wp_size
-        self.fill_labels_sp(labeled, num, classified_water_region, cfg.WATERBLOCK, counts, counts.changed_water, validator)
+        self.filler = cfg.WATERBLOCK
 
-    def label_repl(self, identified_shared, classified_repl_region, counts):
-        classified_repl_region = ndimage.binary_erosion(classified_repl_region, structure=np.ones((self.repl_area, self.repl_area, self.repl_area))).astype(classified_repl_region.dtype)
-        labeled, num = label(classified_repl_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
+        if num < cfg.PROCESSES * 5:
+            validator = lambda l, r: l <= self.wp_size
+            self.fill_labels_sp(labeled, num, c_region, counts, counts.changed_water, validator, self.identified)
+        else:
+            self.fill_labels_mp(labeled, num, c_region, identified_shared, counts, counts.changed_water, 2)
+
+    def label_repl(self, identified_shared, c_region, counts):
+        '''
+        Args:
+            identified_shared: ...
+            c_region: ...
+            counts: ...
+        '''
+        c_region = ndimage.binary_erosion(c_region, structure=np.ones((self.repl_area, self.repl_area, self.repl_area))).astype(c_region.dtype)
+        labeled, num = label(c_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
         counts.chunks.value = 0
         counts.label_max.value = num  # last label count = 16 for repl_area = 5
 
-        validator = lambda l, r: True
-        self.fill_labels_sp(labeled, num, classified_repl_region, cfg.SOLIDAREA, counts, counts.changed_repl, validator)
+        self.filler = cfg.SOLIDAREA
+
+        if num < cfg.PROCESSES * 5:
+            validator = lambda l, r: True
+            self.fill_labels_sp(labeled, num, c_region, counts, counts.changed_repl, validator, self.identified)
+        else:
+            self.fill_labels_mp(labeled, num, c_region, identified_shared, counts, counts.changed_repl, 3)
 
     ###############################################################################################
     # Filler functions
     ###############################################################################################
-    def fill_labels_sp(self, labeled, num, region, fill, counts, changed, validator):
-        for idx in range(1, num + 1):
+    # TODO the region is only used inside the validator, use self.region?
+    # TODO argument order
+    def fill_labels_sp(self, labeled, end, region, counts, changed, validator, i_array, begin = 1):
+        for idx in range(begin, end + 1):
             result = np.nonzero(labeled == idx)
             length = len(result[0])
 
             if validator(length, result):
-                self.fill_array(self.identified, result, fill)
+                self.fill_array(i_array, result, self.filler)
                 changed.value += length
 
             counts.chunks.value += 1
 
-    def fill_labels_mp(self, labeled, num, region, identified_shared, counts):
+    def fill_labels_mp(self, labeled, num, region, identified_shared, counts, changed, v_idx):
         upper_bound = int(ceil((num + 1) / cfg.PROCESSES) * cfg.PROCESSES)
         self.elems = int(upper_bound / cfg.PROCESSES)
 
         window_idxs = [i for i in range(1, upper_bound, self.elems)]
 
-        with closing(mp.Pool(processes=cfg.PROCESSES, initializer = self.init_worker, initargs = (identified_shared, region, labeled, counts))) as pool:
+        with closing(mp.Pool(processes=cfg.PROCESSES, initializer = self.init_worker, initargs = (identified_shared, region, labeled, counts, v_idx, changed))) as pool:
             res = pool.map(self.worker_task, window_idxs)
 
         pool.close()
         pool.join()
+
+    ###############################################################################################
+    # Multiprocessing functions
+    ###############################################################################################
+    # TODO combine with classifier mp
+    # TODO clean this up a little bit by using a list?
+    def init_worker(self, i_shared_, c_region_, labeled_, counts_, v_idx, changed_):
+        '''Initialize worker for processing.
+
+        Args:
+            i_shared_: ...
+            c_region: ...
+            labeled_: ...
+        '''
+        global i_shared
+        global c_region
+        global labeled
+        global counts
+        global changed
+        global validator
+
+        i_shared = self.mp_helper.tonumpyarray(i_shared_)
+        c_region = c_region_
+        labeled = labeled_
+        counts = counts_
+        changed = changed_
+
+        if v_idx == 1:
+            validator = lambda l, r: l <= self.apocket_size and self.check_all(c_region, r, cfg.G_AIR)
+        elif v_idx == 2:
+            validator = lambda l, r: l <= self.wp_size
+        else:
+            validator = lambda l, r: True
+
+    def worker_task(self, ix):
+        '''Function to be run inside each worker'''
+        i_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+        num = ix
+
+        self.fill_labels_sp(labeled, num + self.elems, c_region, counts, changed, validator, i_shared, num)
 
     ###############################################################################################
     # Helper functions
@@ -143,36 +204,3 @@ class Identifier:
 
 
 
-    # TODO combine with classifier mp
-    def init_worker(self, i_shared_, c_region_, labeled_, counts_):
-        '''Initialize worker for processing.
-
-        Args:
-            i_shared_: ...
-            c_region: ...
-            labeled_: ...
-        '''
-        global i_shared
-        global c_region
-        global labeled
-        global counts
-
-        i_shared = self.mp_helper.tonumpyarray(i_shared_)
-        c_region = c_region_
-        labeled = labeled_
-        counts = counts_
-
-    def worker_task(self, ix):
-        '''Function to be run inside each worker'''
-        i_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-        num = ix
-
-        for idx in range(num, num + self.elems):
-            result = np.nonzero(labeled == idx)
-            length = len(result[0])
-
-            if length <= self.apocket_size and self.check_all(c_region, result, cfg.G_AIR):
-                self.fill_array(i_shared, result, cfg.AIRPOCKET)
-                counts.changed_air.value += length
-
-            counts.chunks.value += 1
