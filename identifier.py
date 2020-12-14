@@ -25,8 +25,8 @@ class Identifier:
         self.apocket_size = int(meta_info.apocket_size.get())
         self.repl_area = int(meta_info.repl_area.get()) * 2 + 1
 
-        self.water_blocks = meta_info.water_blocks.get()
         self.air_pockets = meta_info.air_pockets.get()
+        self.water_blocks = meta_info.water_blocks.get()
         self.repl_blocks = meta_info.repl_blocks.get()
 
         self.change_count_water = 0
@@ -44,17 +44,20 @@ class Identifier:
     # modify: 476081
     # save: 208582
     # total: 814072 upto 900000
-    def identify(self, classified_air_region, classified_water_region, classified_repl_region, counts):
+    def identify(self, c_regions, counts):
         identified_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
 
         self.identified = self.mp_helper.tonumpyarray(identified_shared)
         self.identified.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
 
-        self.label_air(identified_shared, classified_air_region, counts)
-        self.label_repl(identified_shared, classified_repl_region, counts)
+        if (self.air_pockets == 1):
+            self.label_air(identified_shared, c_regions[cfg.C_A_AIR], counts)
+        if (self.repl_blocks == 1):
+            self.label_repl(identified_shared, c_regions[cfg.C_A_REPL], counts)
         # Do the water replacement after the block replacement to prevent changes of
         # water pockets due to replacement
-        self.label_water(identified_shared, classified_water_region, counts)
+        if (self.water_blocks == 1):
+            self.label_water(identified_shared, c_regions[cfg.C_A_WATER], counts)
 
     ###############################################################################################
     # Labeling functions
@@ -192,15 +195,3 @@ class Identifier:
             if array[x, y, z] != value:
                 return False
         return True
-
-
-
-
-
-
-
-
-
-
-
-

@@ -19,6 +19,7 @@ class ClassifierMP:
     def __init__(self, meta_info):
         # TODO dublicate with identifier
         self.mp_helper = MP_Helper()
+        self.c_regions = [None] * cfg.C_A_COUNT
 
     def classify_all_mp(self, region, chunk_count):
 
@@ -36,12 +37,9 @@ class ClassifierMP:
         pool.close()
         pool.join()
 
-        self.classified_air_region = self.mp_helper.tonumpyarray(shared_arrays[cfg.C_A_AIR])
-        self.classified_air_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-        self.classified_water_region = self.mp_helper.tonumpyarray(shared_arrays[cfg.C_A_WATER])
-        self.classified_water_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-        self.classified_repl_region = self.mp_helper.tonumpyarray(shared_arrays[cfg.C_A_REPL])
-        self.classified_repl_region.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+        for idx in range(cfg.C_A_COUNT):
+            self.c_regions[idx] = self.mp_helper.tonumpyarray(shared_arrays[idx])
+            self.c_regions[idx].shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
 
     def init_worker(self, shared_arrays_, region_, chunk_count_):
         '''Initialize worker for processing.

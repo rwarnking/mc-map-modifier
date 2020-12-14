@@ -168,19 +168,14 @@ class Modifier():
         self.meta_info.algo_step = cfg.A_CLASSIFY
         self.meta_info.counts.chunks.value = 0
         classifier_mp = ClassifierMP(self.meta_info)
-        # TODO if no mode is selected dont do this
-        classifier_mp.classify_all_mp(region, self.meta_info.counts.chunks)
+        if self.air_pockets + self.repl_blocks + self.water_blocks > 0:
+            classifier_mp.classify_all_mp(region, self.meta_info.counts.chunks)
 
         ms2 = int(round(time.time() * 1000))
         print(f"Classifier time: {ms2 - ms}")
 
         self.meta_info.algo_step = cfg.A_IDENTIFY
-        self.identifier.identify(
-            classifier_mp.classified_air_region,
-            classifier_mp.classified_water_region,
-            classifier_mp.classified_repl_region,
-            self.meta_info.counts
-        )
+        self.identifier.identify(classifier_mp.c_regions, self.meta_info.counts)
 
         ms3 = int(round(time.time() * 1000))
         print(f"Identifier time: {ms3 - ms2}")
