@@ -52,16 +52,16 @@ class MainApp():
 
     def listen_for_result(self, window):
         # TODO setting the maximum here is not optimal but its better than doing it in the modifier
-        c_count = self.meta_info.counts.chunks.value
-        c_count_max = self.meta_info.counts.chunk_max if self.meta_info.algo_step != cfg.A_IDENTIFY else self.meta_info.counts.label_max.value
-        f_count = self.meta_info.file_count
-        f_count_max = self.meta_info.file_count_max
+        c_count = self.meta_info.get_current_count()
+        c_count_max = self.meta_info.get_current_max_count()
+        f_count = self.meta_info.counts.file_count
+        f_count_max = self.meta_info.counts.file_count_max
         self.chunk_progress["value"] = c_count
         self.chunk_progress["maximum"] = c_count_max
         self.chunk_progress.update()
 
-        self.algo_progress["value"] = self.meta_info.algo_step
-        self.algo_progress["maximum"] = self.meta_info.algo_step_max
+        self.algo_progress["value"] = self.meta_info.counts.algo_step
+        self.algo_progress["maximum"] = self.meta_info.counts.algo_step_max
         self.algo_progress.update()
 
         self.file_progress["value"] = f_count
@@ -73,7 +73,7 @@ class MainApp():
 
         if self.meta_info.finished:
             self.chunk_label.config(text=f"Finished all chunks of {c_count_max} chunks.")
-            self.algo_label.config(text=f"Finished all {self.meta_info.algo_step_max} steps.")
+            self.algo_label.config(text=f"Finished all {self.meta_info.counts.algo_step_max} steps.")
             self.file_label.config(text=f"Finished all files of {f_count_max} files.")
             self.time_label.config(text=f"Done.")
 
@@ -85,21 +85,21 @@ class MainApp():
             c_z = int(c_count / cfg.REGION_C_Z)
 
             self.meta_info.update_estimated_time()
-            s = int(self.meta_info.estimated_time % 60)
-            m = int(self.meta_info.estimated_time / 60)
+            s = int(self.meta_info.timer.estimated_time % 60)
+            m = int(self.meta_info.timer.estimated_time / 60)
             self.time_label.config(text=f"Processing Data. Estimated rest time: {m} minutes and {s} seconds.")
 
-            if self.meta_info.algo_step == cfg.A_SAVE:
+            if self.meta_info.counts.algo_step == cfg.A_SAVE:
                 c_x = cfg.REGION_C_X - 1
                 c_z = cfg.REGION_C_Z - 1
                 self.time_label.config(text=f"Writing File. Estimated rest time: 3 minutes.")
 
-            if self.meta_info.algo_step != cfg.A_IDENTIFY:
+            if self.meta_info.counts.algo_step != cfg.A_IDENTIFY:
                 self.chunk_label.config(
                     text=f"Finished chunk ({c_x}, {c_z}) of ({cfg.REGION_C_X - 1}, {cfg.REGION_C_Z - 1}). And {c_count} of {c_count_max} chunks.")
             else:
                 self.chunk_label.config(text=f"Finished {c_count} of {c_count_max} elements.")
-            self.algo_label.config(text=f"Finished {self.meta_info.algo_step} out of {self.meta_info.algo_step_max} steps.")
+            self.algo_label.config(text=f"Finished {self.meta_info.counts.algo_step} out of {self.meta_info.counts.algo_step_max} steps.")
             self.file_label.config(text=f"Finished file {f_count} of {f_count_max} files.")
             window.after(50, lambda: self.listen_for_result(window))
 

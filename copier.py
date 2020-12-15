@@ -153,10 +153,10 @@ class Copier():
         ms = int(round(time.time() * 1000))
 
         # Save to a file
-        self.meta_info.algo_step = cfg.A_SAVE
+        self.meta_info.counts.algo_step = cfg.A_SAVE
         target_dir = self.meta_info.target_dir.get()
         new_region.save(target_dir + "/" + filename)
-        self.meta_info.algo_step = cfg.A_FINISHED
+        self.meta_info.counts.algo_step = cfg.A_FINISHED
 
         ms2 = int(round(time.time() * 1000))
         print(f"Save time: {ms2 - ms}")
@@ -167,32 +167,32 @@ class Copier():
         ms = int(round(time.time() * 1000))
 
         # TODO combine these into a function?
-        self.meta_info.algo_step = cfg.A_CLASSIFY
-        self.meta_info.counts.chunks.value = 0
+        self.meta_info.counts.algo_step = cfg.A_CLASSIFY
+        self.meta_info.counts.chunks_c.value = 0
         classifier_mp = ClassifierMP(self.meta_info)
         if self.air_pockets + self.repl_blocks + self.water_blocks > 0:
-            classifier_mp.classify_all_mp(region, self.meta_info.counts.chunks)
+            classifier_mp.classify_all_mp(region, self.meta_info.counts, self.meta_info.timer)
 
         ms2 = int(round(time.time() * 1000))
         print(f"Classifier time: {ms2 - ms}")
 
-        self.meta_info.algo_step = cfg.A_IDENTIFY
-        self.identifier.identify(classifier_mp.c_regions, self.meta_info.counts)
+        self.meta_info.counts.algo_step = cfg.A_IDENTIFY
+        self.identifier.identify(classifier_mp.c_regions, self.meta_info.counts, self.meta_info.timer)
 
         ms3 = int(round(time.time() * 1000))
         print(f"Identifier time: {ms3 - ms2}")
 
-        self.meta_info.algo_step = cfg.A_MODIFY
-        self.meta_info.counts.chunks.value = 0
+        self.meta_info.counts.algo_step = cfg.A_MODIFY
+        self.meta_info.counts.chunks_m.value = 0
         for chunk_x in range(cfg.REGION_C_X):
 
-            self.meta_info.start_time()
+            self.meta_info.timer.start_time()
             for chunk_z in range(cfg.REGION_C_Z):
                 self.copy_chunk(new_region, region, repl_region, chunk_x, chunk_z)
-                self.meta_info.counts.chunks.value += 1
+                self.meta_info.counts.chunks_m.value += 1
 
-            self.meta_info.end_time()
-            self.meta_info.update_elapsed()
+            self.meta_info.timer.end_time()
+            self.meta_info.timer.update_m_elapsed(self.meta_info.counts)
 
         ms4 = int(round(time.time() * 1000))
         print(f"Modify time: {ms4 - ms3}")

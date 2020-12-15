@@ -21,7 +21,7 @@ class ClassifierMP:
         self.mp_helper = MP_Helper()
         self.c_regions = [None] * cfg.C_A_COUNT
 
-    def classify_all_mp(self, region, chunk_count):
+    def classify_all_mp(self, region, counts, timer):
 
         # Create a list of shared arrays that have the specified size
         shared_arrays = [self.mp_helper.init_shared(cfg.REGION_B_TOTAL) for x in range(cfg.C_A_COUNT)]
@@ -31,7 +31,7 @@ class ClassifierMP:
                     itertools.product(range(0, cfg.REGION_C_X),
                                         range(0, cfg.REGION_C_Z))]
 
-        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (shared_arrays, region, chunk_count))) as pool:
+        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (shared_arrays, region, counts, timer))) as pool:
             res = pool.map(self.worker_task, window_idxs)
 
         pool.close()
@@ -41,7 +41,7 @@ class ClassifierMP:
             self.c_regions[idx] = self.mp_helper.tonumpyarray(shared_arrays[idx])
             self.c_regions[idx].shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
 
-    def init_worker(self, shared_arrays_, region_, chunk_count_):
+    def init_worker(self, shared_arrays_, region_, counts_, timer_):
         '''Initialize worker for processing.
 
         Args:
@@ -49,19 +49,23 @@ class ClassifierMP:
         '''
         global shared_arrays
         global region
-        global chunk_count
+        global counts
+        global timer
 
         shared_arrays = [self.mp_helper.tonumpyarray(array) for array in shared_arrays_]
         region = region_
-        chunk_count = chunk_count_
+        counts = counts_
+        timer = timer_
 
     def worker_task(self, ix):
         '''Function to be run inside each worker'''
+        timer.start2_time()
+
         for array in shared_arrays:
             array.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         chunk_x, chunk_z = ix
 
-        chunk_count.value += 1
+        counts.chunks_c.value += 1
 
         try:
             chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
@@ -70,6 +74,9 @@ class ClassifierMP:
 
         if chunk:
             self.classify(chunk, chunk_x, chunk_z)
+
+        timer.end2_time()
+        timer.update_c_elapsed(counts)
 
     def classify(self, chunk, chunk_x, chunk_z):
         x = 0

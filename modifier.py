@@ -85,6 +85,34 @@ class Modifier():
 
         return b
 
+    # TODO using multi processing for the block assignment to the chunks was tried once
+    # unsing the multiprocessing manager list, this did not lead to acceptable results,
+    # since the needed time for 100 elements was already similar to the complete duration
+    # of the single process function. The problem may be the big data structure that is build
+    # and needs to be serialised for the shared usage. Using a different type of multiprocessing
+    # may solve this but was not tried.
+    def copy_chunks_mp(self, new_region, region, repl_region):
+        # Create pairs to index the different chunks -> (0, 0) (0, 1) (0, m) (1, 0) (2, 0) (n, m)
+        # TODO
+        import itertools
+        import multiprocessing as mp
+        from contextlib import closing
+        window_idxs = [(i, j) for i, j in
+                    itertools.product(range(cfg.REGION_C_X),
+                        range(cfg.REGION_C_Z))]
+
+        import multiprocessing
+        manager = multiprocessing.Manager()
+        chunks = manager.list([None] * 1024)
+
+        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (new_region, region, repl_region, chunks))) as pool:
+            res = pool.map(self.worker_task, window_idxs)
+
+        pool.close()
+        pool.join()
+
+        new_region.chunks = chunks
+
     ###############################################################################################
 
     # self.make_tunnel([500,0,0], [2000,0,1024])
