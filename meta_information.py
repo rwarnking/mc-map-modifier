@@ -80,6 +80,12 @@ class MetaInformation():
             self.water_blocks.get() == 1 or self.air_pockets.get() == 1 or self.repl_blocks.get() == 1
         )
 
+    def get_tunnel_start(self):
+        return [175, 90, 250]
+
+    def get_tunnel_end(self):
+        return [400, 90, 250]
+
 class Counts():
 
     def __init__(self):

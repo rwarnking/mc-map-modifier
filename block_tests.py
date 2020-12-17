@@ -11,6 +11,7 @@ water_blocks = [
     'flowing_water'
 ]
 
+# TODO is this needed ? remove unused and make own for lava
 # CARE: does not contain fences!
 # transparent_blocks = water_blocks + [
 transparent_blocks = [
@@ -150,6 +151,18 @@ underground_blocks = [
     'bedrock'
 ]
 
+# TODO missing plants
+plants = [
+    'grass',
+    'fern',
+    'tall_grass',
+    'large_fern',
+    'kelp',
+    'kelp_plant',
+    'seagrass',
+    'tall_seagrass'
+]
+
 def is_air(block_id):
     return block_id in air_blocks
 
@@ -171,8 +184,11 @@ def is_fence(block_id):
 def is_slab(block_id):
     return 'slab' in block_id
 
+def is_plant(block_id):
+    return block_id in plants
+
 def is_transparent(block_id):
-    return block_id in transparent_blocks or is_leave(block_id) or is_glass(block_id) or is_fence(block_id) or is_slab(block_id)
+    return block_id in transparent_blocks or is_leave(block_id) or is_glass(block_id) or is_fence(block_id) or is_slab(block_id) or is_plant(block_id)
 
 ###################################################################################################
 
@@ -273,3 +289,12 @@ def get_water_type(block_id):
         return cfg.G_BACKGROUND
     else:
         return cfg.G_SOLID
+
+###################################################################################################
+
+# Used for the tunnel functionality
+def is_hot(block_id):
+    if is_transparent(block_id) or is_water(block_id):
+        return True
+    else:
+        return False

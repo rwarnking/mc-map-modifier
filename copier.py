@@ -152,6 +152,14 @@ class Copier():
 
         ms = int(round(time.time() * 1000))
 
+        ##########################################
+        # Other modifications
+        ##########################################
+        # if self.meta_info.make_tunnel()
+        self.modifier.make_tunnel(region, new_region, rX, rZ, self.meta_info.get_tunnel_start(), self.meta_info.get_tunnel_end())
+        self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 80, 100], [125, 80, 350])
+        self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 60, 100], [225, 60, 350])
+
         # Save to a file
         self.meta_info.counts.algo_step = cfg.A_SAVE
         target_dir = self.meta_info.target_dir.get()
