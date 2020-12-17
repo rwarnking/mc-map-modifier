@@ -159,6 +159,10 @@ class Copier():
         self.modifier.make_tunnel(region, new_region, rX, rZ, self.meta_info.get_tunnel_start(), self.meta_info.get_tunnel_end())
         self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 80, 100], [125, 80, 350])
         self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 60, 100], [225, 60, 350])
+        self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 100, 100], [325, 100, 250])
+
+        ms2 = int(round(time.time() * 1000))
+        print(f"Tunnel time: {ms2 - ms}")
 
         # Save to a file
         self.meta_info.counts.algo_step = cfg.A_SAVE
@@ -166,8 +170,8 @@ class Copier():
         new_region.save(target_dir + "/" + filename)
         self.meta_info.counts.algo_step = cfg.A_FINISHED
 
-        ms2 = int(round(time.time() * 1000))
-        print(f"Save time: {ms2 - ms}")
+        ms = int(round(time.time() * 1000))
+        print(f"Save time: {ms - ms2}")
 
     ###############################################################################################
 

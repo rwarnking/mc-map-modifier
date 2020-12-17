@@ -47,5 +47,9 @@ WATERBLOCK = 1
 AIRPOCKET = 2
 SOLIDAREA = 3
 
+# Modifier
+M_DIR_X = 0
+M_DIR_Z = 1
+
 # For multiprocessing
 PROCESSES = 4

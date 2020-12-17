@@ -3,7 +3,7 @@ import anvil
 
 # Own imports
 import config as cfg
-from block_tests import is_solid, is_hot
+from block_tests import is_solid, is_hot, is_repl_block
 
 class Modifier():
     def __init__(self, identifier):
@@ -29,17 +29,23 @@ class Modifier():
         gold_block = anvil.Block('minecraft', 'gold_block')
         blue_wool = anvil.Block('minecraft', 'blue_wool')
 
+        # print((chunk.data['TileEntities']))
+
         # Iterate all blocks and select write the new block to the new_chunk
         for block in chunk.stream_chunk():
             b = block
-
-            if b.id == 'chest':
-                print(b.properties)
 
             x_region = chunk_x * cfg.CHUNK_B_X + x
             z_region = chunk_z * cfg.CHUNK_B_Z + z
             x_global = new_region.x * cfg.REGION_B_X + x_region
             z_global = new_region.z * cfg.REGION_B_Z + z_region
+
+            if b.id == 'chest' and x_region == 167 and z_region == 201:
+                print(b.properties)
+                print(chunk.data['TileEntities'])
+                print(chunk.get_tile_entity(x_region, y, z_region))
+                for t in chunk.get_tile_entity(x_region, y, z_region)['Items']:
+                    print(t['Count'], t['Slot'], t['id'])
 
             xyz = self.identifier.identified[x_region, y, z_region]
             if xyz == cfg.WATERBLOCK:
@@ -137,54 +143,49 @@ class Modifier():
         end_r_x = int(end[0] / cfg.REGION_B_X)
         end_r_z = int(end[2] / cfg.REGION_B_Z)
 
-        # print(start_r_x, start_r_z)
-        # print(end_r_x, end_r_z)
-        # if abs(start_r_x - end_r_x) > abs(start_r_z - end_r_z):
-        #     window_idxs = [(i, j) for i, j in
-        #                     itertools.product(range(start_r_x, end_r_x + 1),
-        #                                       range(start_r_z, start_r_z + 1))]
-
-        #     window_idxs += [(i, j) for i, j in
-        #                     itertools.product(range(end_r_x, end_r_x + 1),
-        #                                       range(start_r_z + 1, end_r_z + 1))]
-        # else:
-        #     window_idxs = [(i, j) for i, j in
-        #                     itertools.product(range(start_r_x, start_r_x + 1),
-        #                                       range(start_r_z, end_r_z + 1))]
-
-        #     window_idxs += [(i, j) for i, j in
-        #                     itertools.product(range(start_r_x + 1, end_r_x + 1),
-        #                                       range(end_r_z, end_r_z + 1))]
-        # print(window_idxs)
-
-        # if [rX, rZ] in window_idxs
         region_min_x = rX * cfg.REGION_B_X
         region_max_x = (rX + 1) * cfg.REGION_B_X
         region_min_z = rZ * cfg.REGION_B_Z
         region_max_z = (rZ + 1) * cfg.REGION_B_Z
 
-        torch_dist = 5
-        dir_r_x = end_r_x
-        dir_r_z = start_r_z
-        if abs(start_r_x - end_r_x) < abs(start_r_z - end_r_z):
-            dir_r_x = start_r_x
-            dir_r_z = end_r_z
+        self.item_dict = {}
 
+        torch_dist = 5
+        dir_r_x = start_r_x
+        dir_r_z = end_r_z
+        new_x = end[0]
+        new_z = start[2]
+        direction = cfg.M_DIR_X
+        # TODO this does not really work for negative numbers
+        if abs(end[0] - start[0]) < abs(end[2] - start[2]):
+            dir_r_x = end_r_x
+            dir_r_z = start_r_z
+            new_x = start[0]
+            new_z = end[2]
+            direction = cfg.M_DIR_Z
+
+        # TODO height is not dynamic (start[1])
         if dir_r_z == rZ and start_r_x <= rX and end_r_x >= rX:
             this_min_x = start[0] if (start[0] > region_min_x) else region_min_x
             this_max_x = end[0] if (end[0] < region_max_x) else region_max_x
             for x in range(this_min_x, this_max_x):
-                self.set_5x5_x(region, new_region, x, start[1], start[2], x % torch_dist == 0)
+                self.set_5x5_x(region, new_region, x, start[1], new_z, x % torch_dist == 0)
         if dir_r_x == rX and start_r_z <= rZ and end_r_z >= rZ:
             this_min_z = start[2] if (start[2] > region_min_z) else region_min_z
             this_max_z = end[2] if (end[2] < region_max_z) else region_max_z
             for z in range(this_min_z, this_max_z):
-                self.set_5x5_z(region, new_region, start[0], start[1], z, z % torch_dist == 0)
+                self.set_5x5_z(region, new_region, new_x, start[1], z, z % torch_dist == 0)
+
+        print(self.item_dict)
+        # TODO gui
+        if True:
+            self.place_chests(new_region, start[0], start[1], start[2], direction)
 
 
-    # TODO these 4 functions should be combinable
+    # TODO these 2 functions should be combinable
     def set_5x5_x(self, region, new_region, x, y, z, place_torch):
-        self.set_3x3_x(new_region, x, y, z, place_torch)
+        self.set_3x3(new_region, x, y, z, place_torch)
+        self.get_blocks_3x3(region, x, y, z)
 
         # Top layer
         for add_z in range(-2, 3):
@@ -203,14 +204,72 @@ class Modifier():
             b = self.get_border_block(region, x, y + add_y, z + 3)
             new_region.set_block(b, x, y + add_y, z + 2)
 
-        if place_torch and self.test_floor(region, x, y, z):
+        if place_torch:
+            self.place_r_torch(region, new_region, x, y, z)
+
+    def set_5x5_z(self, region, new_region, x, y, z, place_torch):
+        self.set_3x3(new_region, x, y, z, place_torch, cfg.M_DIR_Z)
+        self.get_blocks_3x3(region, x, y, z)
+
+        # Top layer
+        for add_x in range(-2, 3):
+            b = self.get_border_block(region, x + add_x, y + 3, z)
+            new_region.set_block(b, x + add_x, y + 2, z)
+
+        # Bottom layer
+        for add_x in range(-2, 3):
+            b = self.get_border_block(region, x + add_x, y - 3, z)
+            new_region.set_block(b, x + add_x, y - 2, z)
+
+        # Left and right
+        for add_y in range(-2, 3):
+            b = self.get_border_block(region, x - 3, y + add_y, z)
+            new_region.set_block(b, x - 2, y + add_y, z)
+            b = self.get_border_block(region, x + 3, y + add_y, z)
+            new_region.set_block(b, x + 2, y + add_y, z)
+
+        if place_torch:
+            self.place_r_torch(region, new_region, x, y, z)
+
+    def place_r_torch(self, region, new_region, x, y, z):
+        if self.test_floor(region, x, y, z):
             for i in range(-1, 2):
                 for j in range(0, 2):
                     for k in range(-1, 2):
                         new_region.set_block(self.stone, x + i, y - 3 - j, z + k)
             new_region.set_block(self.r_torch, x, y - 3, z)
-        elif place_torch:
-            new_region.set_block(self.r_torch, x, y - 1, z + 1)
+        else:
+            new_region.set_block(self.r_torch, x + 1, y - 1, z)
+
+    def set_3x3(self, r, x, y, z, place_torch, direction = cfg.M_DIR_X):
+        torch = self.torch if place_torch else self.air
+        rail = anvil.Block('minecraft', 'powered_rail') if place_torch else anvil.Block('minecraft', 'rail')
+        if place_torch:
+            rail.properties['powered'] = 'true'
+
+        x_m_one = x - 1
+        x_p_one = x + 1
+        z_m_one = z
+        z_p_one = z
+        if direction == cfg.M_DIR_X:
+            rail.properties['shape'] = 'east_west'
+            x_m_one = x
+            x_p_one = x
+            z_m_one = z - 1
+            z_p_one = z + 1
+
+        # Middle layer -> air
+        r.set_block(self.air, x, y, z)
+        r.set_block(self.air, x_m_one, y, z_m_one)
+        r.set_block(self.air, x_p_one, y, z_p_one)
+        # Top layer -> air
+        r.set_block(self.air, x, y + 1, z)
+        r.set_block(self.air, x_m_one, y + 1, z_m_one)
+        r.set_block(self.air, x_p_one, y + 1, z_p_one)
+        # Bot layer -> air, torches, rails and powered rails
+        r.set_block(torch, x_m_one, y - 1, z_m_one)
+        r.set_block(rail, x, y - 1, z)
+        r.set_block(torch, x_p_one, y - 1, z_p_one)
 
     def get_border_block(self, region, x, y, z):
         block_r_x = (x % cfg.REGION_B_X)
@@ -235,68 +294,76 @@ class Modifier():
                     return False
         return True
 
-    def set_3x3_x(self, r, x, y, z, place_torch):
-        torch = self.torch if place_torch else self.air
-        rail = anvil.Block('minecraft', 'powered_rail') if place_torch else anvil.Block('minecraft', 'rail')
-        rail.properties['shape'] = 'east_west'
-        if place_torch:
-            rail.properties['powered'] = 'true'
-        # Middle layer -> air
-        r.set_block(self.air, x, y, z)
-        r.set_block(self.air, x, y, z - 1)
-        r.set_block(self.air, x, y, z + 1)
-        # Top layer -> air
-        r.set_block(self.air, x, y + 1, z)
-        r.set_block(self.air, x, y + 1, z - 1)
-        r.set_block(self.air, x, y + 1, z + 1)
-        # Bot layer -> air, torches, rails and powered rails
-        r.set_block(torch, x, y - 1, z - 1)
-        r.set_block(rail, x, y - 1, z)
-        r.set_block(torch, x, y - 1, z + 1)
+    def get_blocks_3x3(self, region, x, y, z):
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                for k in range(-1, 2):
+                    block_r_x = ((x + i) % cfg.REGION_B_X)
+                    block_r_z = ((z + k) % cfg.REGION_B_Z)
+                    chunk = anvil.Chunk.from_region(region, int(block_r_x / cfg.CHUNK_B_X), int(block_r_z / cfg.CHUNK_B_Z))
+                    block = chunk.get_block(block_r_x % cfg.CHUNK_B_X, y + j, block_r_z % cfg.CHUNK_B_Z)
 
-    def set_5x5_z(self, region, new_region, x, y, z, place_torch):
-        self.set_3x3_z(new_region, x, y, z, place_torch)
+                    if is_repl_block(block.id):
+                        if block.id in self.item_dict:
+                            self.item_dict[block.id] += 1
+                        else:
+                            self.item_dict[block.id] = 1
 
-        # Top layer
-        for add_x in range(-2, 3):
-            b = self.get_border_block(region, x + add_x, y + 3, z)
-            new_region.set_block(b, x + add_x, y + 2, z)
+    def place_chests(self, new_region, x, y, z, direction):
+        add_x = 1
+        add_z = 0
+        chest = anvil.Block('minecraft', 'chest')
+        chest.properties['waterlogged'] = 'false'
+        chest.properties['facing'] = 'east'
+        chest.properties['type'] = 'single'
 
-        # Bottom layer
-        for add_x in range(-2, 3):
-            b = self.get_border_block(region, x + add_x, y - 3, z)
-            new_region.set_block(b, x + add_x, y - 2, z)
+        if direction == cfg.M_DIR_Z:
+            add_x = 0
+            add_z = 1
+            #chest.properties['shape'] = 'east_west'
+        from nbt import nbt
+        i = 0
+        chest_x = x
+        chest_y = y - 1
+        chest_z = z
 
-        # Left and right
-        for add_y in range(-2, 3):
-            b = self.get_border_block(region, x - 3, y + add_y, z)
-            new_region.set_block(b, x - 2, y + add_y, z)
-            b = self.get_border_block(region, x + 3, y + add_y, z)
-            new_region.set_block(b, x + 2, y + add_y, z)
+        for item_type in self.item_dict:
+            if direction == cfg.M_DIR_Z:
+                chest_x = x + 1
+                chest_z = z + i
+            else:
+                chest_x = x + i
+                chest_z = z + 1
 
-        if place_torch and self.test_floor(region, x, y, z):
-            for i in range(-1, 2):
-                for j in range(0, 2):
-                    for k in range(-1, 2):
-                        new_region.set_block(self.stone, x + i, y - 3 - j, z + k)
-            new_region.set_block(self.r_torch, x, y - 3, z)
-        elif place_torch:
-            new_region.set_block(self.r_torch, x + 1, y - 1, z)
+            # TODO enumerate probably doesnt work since we need a value dependent on the chest count
+            new_region.set_block(chest, chest_x, y, chest_z)
 
-    def set_3x3_z(self, r, x, y, z, place_torch):
-        torch = self.torch if place_torch else self.air
-        rail = anvil.Block('minecraft', 'powered_rail') if place_torch else anvil.Block('minecraft', 'rail')
-        if place_torch:
-            rail.properties['powered'] = 'true'
-        # Middle layer -> air
-        r.set_block(self.air, x, y, z)
-        r.set_block(self.air, x - 1, y, z)
-        r.set_block(self.air, x + 1, y, z)
-        # Top layer -> air
-        r.set_block(self.air, x, y + 1, z)
-        r.set_block(self.air, x - 1, y + 1, z)
-        r.set_block(self.air, x + 1, y + 1, z)
-        # Bot layer -> air, torches, rails and powered rails
-        r.set_block(torch, x - 1, y - 1, z)
-        r.set_block(rail, x, y - 1, z)
-        r.set_block(torch, x + 1, y - 1, z)
+            items = nbt.TAG_List(name='Items', type=nbt.TAG_Compound)
+            chest_entry = nbt.TAG_Compound()
+            chest_entry.tags.extend([
+                nbt.TAG_Byte(name='Count', value=64),
+                nbt.TAG_Byte(name='Slot', value=1),
+                nbt.TAG_String(name='id', value='minecraft:iron_ingot')
+            ])
+            items.tags.append(chest_entry)
+
+            block_entity = nbt.TAG_Compound()
+            block_entity.tags.extend([
+                nbt.TAG_String(name='id', value='minecraft:chest'),
+                nbt.TAG_Int(name='x', value=chest_x),
+                nbt.TAG_Int(name='y', value=chest_y),
+                nbt.TAG_Int(name='z', value=chest_z),
+                nbt.TAG_Byte(name='keepPacked', value=0)
+            ])
+            block_entity.tags.append(items)
+
+            chunk_idx_x = chest_x // cfg.CHUNK_B_X
+            chunk_idx_z = chest_z // cfg.CHUNK_B_Z
+            chunk = new_region.get_chunk(chunk_idx_x, chunk_idx_z)
+
+            if chunk.data['TileEntities'].tagID != nbt.TAG_Compound.id:
+                chunk.data['TileEntities'] = nbt.TAG_List(name='TileEntities', type=nbt.TAG_Compound)
+            chunk.data['TileEntities'].tags.append(block_entity)
+            print(block_entity)
+            print(chunk.data['TileEntities'])
+            i += 1
