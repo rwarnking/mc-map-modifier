@@ -1,5 +1,6 @@
 # minecraft import
 import anvil
+from nbt import nbt
 
 # Own imports
 import config as cfg
@@ -29,8 +30,6 @@ class Modifier():
         gold_block = anvil.Block('minecraft', 'gold_block')
         blue_wool = anvil.Block('minecraft', 'blue_wool')
 
-        # print((chunk.data['TileEntities']))
-
         # Iterate all blocks and select write the new block to the new_chunk
         for block in chunk.stream_chunk():
             b = block
@@ -39,13 +38,6 @@ class Modifier():
             z_region = chunk_z * cfg.CHUNK_B_Z + z
             x_global = new_region.x * cfg.REGION_B_X + x_region
             z_global = new_region.z * cfg.REGION_B_Z + z_region
-
-            if b.id == 'chest' and x_region == 167 and z_region == 201:
-                print(b.properties)
-                print(chunk.data['TileEntities'])
-                print(chunk.get_tile_entity(x_region, y, z_region))
-                for t in chunk.get_tile_entity(x_region, y, z_region)['Items']:
-                    print(t['Count'], t['Slot'], t['id'])
 
             xyz = self.identifier.identified[x_region, y, z_region]
             if xyz == cfg.WATERBLOCK:
@@ -176,7 +168,6 @@ class Modifier():
             for z in range(this_min_z, this_max_z):
                 self.set_5x5_z(region, new_region, new_x, start[1], z, z % torch_dist == 0)
 
-        print(self.item_dict)
         # TODO gui
         if True:
             self.place_chests(new_region, start[0], start[1], start[2], direction)
@@ -321,49 +312,71 @@ class Modifier():
             add_x = 0
             add_z = 1
             #chest.properties['shape'] = 'east_west'
-        from nbt import nbt
+
         i = 0
         chest_x = x
         chest_y = y - 1
         chest_z = z
 
         for item_type in self.item_dict:
-            if direction == cfg.M_DIR_Z:
-                chest_x = x + 1
-                chest_z = z + i
-            else:
-                chest_x = x + i
-                chest_z = z + 1
+            amount = self.item_dict[item_type]
 
-            # TODO enumerate probably doesnt work since we need a value dependent on the chest count
-            new_region.set_block(chest, chest_x, y, chest_z)
+            while amount > 0:
+                if direction == cfg.M_DIR_Z:
+                    chest_x = x + 1
+                    chest_z = z + i
+                else:
+                    chest_x = x + i
+                    chest_z = z + 1
 
-            items = nbt.TAG_List(name='Items', type=nbt.TAG_Compound)
+                new_region.set_block(chest, chest_x, chest_y, chest_z)
+
+                item = 'minecraft:' + str(item_type)
+                block_entity, amount = self.create_chest_block_entity(chest_x, chest_y, chest_z, item, amount)
+
+                chunk_idx_x = chest_x // cfg.CHUNK_B_X
+                chunk_idx_z = chest_z // cfg.CHUNK_B_Z
+                chunk = new_region.get_chunk(chunk_idx_x, chunk_idx_z)
+
+                if chunk.data['TileEntities'].tagID != nbt.TAG_Compound.id:
+                    chunk.data['TileEntities'] = nbt.TAG_List(name='TileEntities', type=nbt.TAG_Compound)
+                chunk.data['TileEntities'].tags.append(block_entity)
+                i += 1
+
+    def create_chest_block_entity(self, chest_x, chest_y, chest_z, b_type, amount):
+        items = nbt.TAG_List(name='Items', type=nbt.TAG_Compound)
+
+        # TODO make this variable by using the config file
+        stacks = min(amount // 64, 27)
+        remainder = amount % 64 if stacks < 27 else 0
+
+        for i in range(stacks):
             chest_entry = nbt.TAG_Compound()
             chest_entry.tags.extend([
                 nbt.TAG_Byte(name='Count', value=64),
-                nbt.TAG_Byte(name='Slot', value=1),
-                nbt.TAG_String(name='id', value='minecraft:iron_ingot')
+                nbt.TAG_Byte(name='Slot', value=i),
+                nbt.TAG_String(name='id', value=b_type)
             ])
             items.tags.append(chest_entry)
 
-            block_entity = nbt.TAG_Compound()
-            block_entity.tags.extend([
-                nbt.TAG_String(name='id', value='minecraft:chest'),
-                nbt.TAG_Int(name='x', value=chest_x),
-                nbt.TAG_Int(name='y', value=chest_y),
-                nbt.TAG_Int(name='z', value=chest_z),
-                nbt.TAG_Byte(name='keepPacked', value=0)
+        if stacks < 27:
+            chest_entry = nbt.TAG_Compound()
+            chest_entry.tags.extend([
+                nbt.TAG_Byte(name='Count', value=amount % 64),
+                nbt.TAG_Byte(name='Slot', value=stacks),
+                nbt.TAG_String(name='id', value=b_type)
             ])
-            block_entity.tags.append(items)
+            items.tags.append(chest_entry)
 
-            chunk_idx_x = chest_x // cfg.CHUNK_B_X
-            chunk_idx_z = chest_z // cfg.CHUNK_B_Z
-            chunk = new_region.get_chunk(chunk_idx_x, chunk_idx_z)
+        block_entity = nbt.TAG_Compound()
+        block_entity.tags.extend([
+            nbt.TAG_String(name='id', value='minecraft:chest'),
+            nbt.TAG_Int(name='x', value=chest_x),
+            nbt.TAG_Int(name='y', value=chest_y),
+            nbt.TAG_Int(name='z', value=chest_z),
+            nbt.TAG_Byte(name='keepPacked', value=0)
+        ])
+        block_entity.tags.append(items)
 
-            if chunk.data['TileEntities'].tagID != nbt.TAG_Compound.id:
-                chunk.data['TileEntities'] = nbt.TAG_List(name='TileEntities', type=nbt.TAG_Compound)
-            chunk.data['TileEntities'].tags.append(block_entity)
-            print(block_entity)
-            print(chunk.data['TileEntities'])
-            i += 1
+        new_amount = amount - (stacks * 64 + remainder)
+        return block_entity, new_amount
