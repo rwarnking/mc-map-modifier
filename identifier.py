@@ -79,7 +79,7 @@ class Identifier:
             self.fill_labels_mp(labeled, num, c_region, identified_shared, counts, counts.changed_air, 1, timer)
 
     def label_water(self, identified_shared, c_region, counts, timer):
-        labeled, num = label(c_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
+        labeled, num = label(c_region, connectivity=3, return_num=True, background=cfg.G_BACKGROUND)
         counts.label_i.value = 0
         counts.label_i_max.value = num # last label count = 9
 
@@ -98,7 +98,8 @@ class Identifier:
             c_region: ...
             counts: ...
         '''
-        c_region = ndimage.binary_erosion(c_region, structure=np.ones((self.repl_area, self.repl_area, self.repl_area))).astype(c_region.dtype)
+        if self.repl_area > 0:
+            c_region = ndimage.binary_erosion(c_region, structure=np.ones((self.repl_area, self.repl_area, self.repl_area))).astype(c_region.dtype)
         labeled, num = label(c_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND)
         counts.label_i.value = 0
         counts.label_i_max.value = num  # last label count = 16 for repl_area = 5
