@@ -1,21 +1,18 @@
-# minecraft import
-import anvil
-
 # Multiprocessing
 import itertools
 import multiprocessing as mp
 from contextlib import closing
 
-# For array manipulations
-import numpy as np
-
-# Own imports
-from block_tests import get_air_type, get_water_type, get_repl_type
-from mp_helper import MP_Helper
+# minecraft import
+import anvil
 import config as cfg
 
-class ClassifierMP:
+# Own imports
+from block_tests import get_air_type, get_repl_type, get_water_type
+from mp_helper import MP_Helper
 
+
+class ClassifierMP:
     def __init__(self, meta_info):
         # TODO dublicate with identifier
         self.mp_helper = MP_Helper()
@@ -24,15 +21,24 @@ class ClassifierMP:
     def classify_all_mp(self, region, counts, timer):
 
         # Create a list of shared arrays that have the specified size
-        shared_arrays = [self.mp_helper.init_shared(cfg.REGION_B_TOTAL) for x in range(cfg.C_A_COUNT)]
+        shared_arrays = [
+            self.mp_helper.init_shared(cfg.REGION_B_TOTAL) for x in range(cfg.C_A_COUNT)
+        ]
 
         # Create pairs to index the different chunks -> (0, 0) (0, 1) (0, m) (1, 0) (2, 0) (n, m)
-        window_idxs = [(i, j) for i, j in
-                    itertools.product(range(0, cfg.REGION_C_X),
-                                        range(0, cfg.REGION_C_Z))]
+        window_idxs = [
+            (i, j)
+            for i, j in itertools.product(range(0, cfg.REGION_C_X), range(0, cfg.REGION_C_Z))
+        ]
 
-        with closing(mp.Pool(processes=4, initializer = self.init_worker, initargs = (shared_arrays, region, counts, timer))) as pool:
-            res = pool.map(self.worker_task, window_idxs)
+        with closing(
+            mp.Pool(
+                processes=4,
+                initializer=self.init_worker,
+                initargs=(shared_arrays, region, counts, timer),
+            )
+        ) as pool:
+            pool.map(self.worker_task, window_idxs)
 
         pool.close()
         pool.join()
@@ -42,11 +48,11 @@ class ClassifierMP:
             self.c_regions[idx].shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
 
     def init_worker(self, shared_arrays_, region_, counts_, timer_):
-        '''Initialize worker for processing.
+        """Initialize worker for processing.
 
         Args:
             shared_array_: Object returned by init_shared
-        '''
+        """
         global shared_arrays
         global region
         global counts
@@ -58,7 +64,7 @@ class ClassifierMP:
         timer = timer_
 
     def worker_task(self, ix):
-        '''Function to be run inside each worker'''
+        """Function to be run inside each worker"""
         timer.start2_time()
 
         for array in shared_arrays:
@@ -69,8 +75,8 @@ class ClassifierMP:
 
         try:
             chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
-        except:
-            print(f'skipped non-existent chunk ({chunk_x},{chunk_z})')
+        except Exception:
+            print(f"skipped non-existent chunk ({chunk_x},{chunk_z})")
 
         if chunk:
             self.classify(chunk, chunk_x, chunk_z)

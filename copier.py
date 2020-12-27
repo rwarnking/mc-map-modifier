@@ -1,34 +1,21 @@
+# Timing TODO
+import datetime
+import os  # Needed for the file iteration
+import time
+from time import gmtime, strftime
+from tkinter import messagebox  # Gui TODO
+
 # minecraft import
 import anvil
-
-# Needed for the file iteration
-import os
-
-# For array manipulations
-import numpy as np
-
-# Utilities
-from math import floor
-
-# TODO
-# Timing
-import time
-import datetime
-from time import gmtime, strftime
-
-# TODO
-# Gui
-from tkinter import messagebox
+import config as cfg
 
 # Own imports
 from classifier_mp import ClassifierMP
 from identifier import Identifier
 from modifier import Modifier
-from block_tests import is_solid
 
-import config as cfg
 
-class Copier():
+class Copier:
     def __init__(self, meta_info):
         self.meta_info = meta_info
 
@@ -38,17 +25,18 @@ class Copier():
     ###############################################################################################
     # Main
     ###############################################################################################
-    def run2(self):
-        # https://www.machinelearningplus.com/python/cprofile-how-to-profile-your-python-code/
-        import cProfile, pstats
-        profiler = cProfile.Profile()
-        profiler.enable()
-        self.run2()
-        profiler.disable()
-        stats = pstats.Stats(profiler).sort_stats('tottime')
-        stats.print_stats()
-        #import cProfile
-        #cProfile.run('self.run2()')
+    # TODO delete
+    # def run2(self):
+    #     # https://www.machinelearningplus.com/python/cprofile-how-to-profile-your-python-code/
+    #     import cProfile, pstats
+    #     profiler = cProfile.Profile()
+    #     profiler.enable()
+    #     self.run2()
+    #     profiler.disable()
+    #     stats = pstats.Stats(profiler).sort_stats("tottime")
+    #     stats.print_stats()
+    #     #import cProfile
+    #     #cProfile.run("self.run2()")
 
     def run(self):
         self.air_pockets = self.meta_info.air_pockets.get()
@@ -57,17 +45,17 @@ class Copier():
 
         # Print detailed informations
         # TODO improve
-        if (self.air_pockets == 1):
+        if self.air_pockets == 1:
             self.meta_info.text_queue.put("Air Blocks will be fixed!\n")
         else:
             self.meta_info.text_queue.put("Air Blocks will not be fixed!\n")
 
-        if (self.water_blocks == 1):
+        if self.water_blocks == 1:
             self.meta_info.text_queue.put("Water Blocks will be fixed!\n")
         else:
             self.meta_info.text_queue.put("Water Blocks will not be fixed!\n")
 
-        if (self.repl_blocks == 1):
+        if self.repl_blocks == 1:
             self.meta_info.text_queue.put("Replacement Blocks will be inserted!\n")
         else:
             self.meta_info.text_queue.put("Replacement Blocks will not be inserted!\n")
@@ -80,7 +68,9 @@ class Copier():
         # Get all files in the directory
         filelist = os.listdir(self.meta_info.source_dir.get())
         if len(filelist) == 0:
-            messagebox.showinfo(message="No files found! Select a different source path.", title = "Error")
+            messagebox.showinfo(
+                message="No files found! Select a different source path.", title="Error"
+            )
             return
 
         tgt_dir = self.meta_info.target_dir.get()
@@ -88,7 +78,9 @@ class Copier():
             if not os.path.exists(tgt_dir):
                 os.mkdir(tgt_dir)
         except OSError:
-            messagebox.showinfo(message="Creation of the directory %s failed" % tgt_dir, title = "Error")
+            messagebox.showinfo(
+                message="Creation of the directory %s failed" % tgt_dir, title="Error"
+            )
 
         # Update the progressbar and label for the files
         self.meta_info.file_count_max = len(filelist)
@@ -109,7 +101,9 @@ class Copier():
         t2 = gmtime()
         self.meta_info.text_queue.put(strftime("%Y-%m-%d %H:%M:%S\n", t2))
         self.meta_info.text_queue.put("Total runtime: ")
-        self.meta_info.text_queue.put(datetime.timedelta(seconds=time.mktime(t2)-time.mktime(t1)))
+        self.meta_info.text_queue.put(
+            datetime.timedelta(seconds=time.mktime(t2) - time.mktime(t1))
+        )
 
         ms2 = int(round(time.time() * 1000))
         print(f"Total time elapsed: {ms2 - ms}")
@@ -119,9 +113,9 @@ class Copier():
     ###############################################################################################
 
     def copyRegion(self, filename):
-        l = filename.split('.')
-        rX = int(l[1])
-        rZ = int(l[2])
+        end = filename.split(".")
+        rX = int(end[1])
+        rZ = int(end[2])
 
         # Create a new region with the `EmptyRegion` class at region coords
         new_region = anvil.EmptyRegion(rX, rZ)
@@ -133,8 +127,8 @@ class Copier():
             try:
                 repl_dir = self.meta_info.replacement_dir.get()
                 repl_region = anvil.Region.from_file(repl_dir + "/" + filename)
-            except:
-                print(f'Could not create replacement region for {filename}.')
+            except Exception:
+                print(f"Could not create replacement region for {filename}.")
 
         ##########################################
         # Main function call
@@ -142,13 +136,20 @@ class Copier():
         self.copy_chunks(new_region, region, repl_region)
 
         if self.water_blocks + self.air_pockets + self.repl_blocks >= 1:
-            self.meta_info.text_queue.put(f'In file {filename}:\n')
+            self.meta_info.text_queue.put(f"In file {filename}:\n")
         if self.air_pockets == 1:
-            self.meta_info.text_queue.put(f'Changed {self.meta_info.counts.changed_air.value} air blocks to solid blocks.\n')
+            self.meta_info.text_queue.put(
+                f"Changed {self.meta_info.counts.changed_air.value} air blocks to solid blocks.\n"
+            )
         if self.water_blocks == 1:
-            self.meta_info.text_queue.put(f'Changed {self.meta_info.counts.changed_water.value} solid blocks to water.\n')
+            self.meta_info.text_queue.put(
+                f"Changed {self.meta_info.counts.changed_water.value} solid blocks to water.\n"
+            )
         if self.repl_blocks == 1:
-            self.meta_info.text_queue.put(f'Changed {self.meta_info.counts.changed_repl.value} solid blocks to replacement solid blocks.\n')
+            self.meta_info.text_queue.put(
+                f"Changed {self.meta_info.counts.changed_repl.value} "
+                "solid blocks to replacement solid blocks.\n"
+            )
 
         ms = int(round(time.time() * 1000))
 
@@ -156,10 +157,13 @@ class Copier():
         # Other modifications
         ##########################################
         # if self.meta_info.make_tunnel()
-        self.modifier.make_tunnel(region, new_region, rX, rZ, self.meta_info.get_tunnel_start(), self.meta_info.get_tunnel_end())
-        self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 80, 100], [125, 80, 350])
-        self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 60, 100], [225, 60, 350])
-        self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 100, 100], [325, 100, 250])
+        # self.modifier.make_tunnel(
+        #     region, new_region, rX, rZ,
+        #     self.meta_info.get_tunnel_start(), self.meta_info.get_tunnel_end()
+        # )
+        # self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 80, 100], [125, 80, 350])
+        # self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 60, 100], [225, 60, 350])
+        # self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 100, 100], [325, 100, 250])
 
         ms2 = int(round(time.time() * 1000))
         print(f"Tunnel time: {ms2 - ms}")
@@ -189,7 +193,9 @@ class Copier():
         print(f"Classifier time: {ms2 - ms}")
 
         self.meta_info.counts.algo_step = cfg.A_IDENTIFY
-        self.identifier.identify(classifier_mp.c_regions, self.meta_info.counts, self.meta_info.timer)
+        self.identifier.identify(
+            classifier_mp.c_regions, self.meta_info.counts, self.meta_info.timer
+        )
 
         ms3 = int(round(time.time() * 1000))
         print(f"Identifier time: {ms3 - ms2}")
@@ -215,8 +221,8 @@ class Copier():
         chunk = None
         try:
             chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
-        except:
-            print(f'skipped non-existent chunk ({chunk_x},{chunk_z})')
+        except Exception:
+            print(f"skipped non-existent chunk ({chunk_x},{chunk_z})")
 
         if chunk:
             # TODO only when the option is ticked?
@@ -224,7 +230,7 @@ class Copier():
             if repl_region:
                 try:
                     repl_chunk = anvil.Chunk.from_region(repl_region, chunk_x, chunk_z)
-                except:
-                    print(f'Could not create replacement chunk for {chunk_x}, {chunk_z}.')
+                except Exception:
+                    print(f"Could not create replacement chunk for {chunk_x}, {chunk_z}.")
 
             self.modifier.modify(chunk, repl_chunk, new_region, chunk_x, chunk_z)

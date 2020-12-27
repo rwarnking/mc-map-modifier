@@ -1,19 +1,14 @@
+import queue
+import time
+
 # Allows for udates inside the multiprocessing
 from multiprocessing import Value
-
-# TODO
-# Timing
-import time
-import datetime
-from time import gmtime, strftime
-
-from tkinter import StringVar, IntVar
-import queue
+from tkinter import IntVar, StringVar
 
 import config as cfg
 
-class MetaInformation():
 
+class MetaInformation:
     def __init__(self):
         self.counts = Counts()
         self.timer = Timer()
@@ -55,7 +50,11 @@ class MetaInformation():
             return self.counts.chunks_c.value
         elif self.counts.algo_step == cfg.A_IDENTIFY:
             return self.counts.label_i.value
-        elif self.counts.algo_step == cfg.A_MODIFY or self.counts.algo_step == cfg.A_SAVE or self.counts.algo_step == cfg.A_FINISHED:
+        elif (
+            self.counts.algo_step == cfg.A_MODIFY
+            or self.counts.algo_step == cfg.A_SAVE
+            or self.counts.algo_step == cfg.A_FINISHED
+        ):
             return self.counts.chunks_m.value
         else:
             # TODO
@@ -67,7 +66,11 @@ class MetaInformation():
             return self.counts.chunk_c_max
         elif self.counts.algo_step == cfg.A_IDENTIFY:
             return self.counts.label_i_max.value
-        elif self.counts.algo_step == cfg.A_MODIFY or self.counts.algo_step == cfg.A_SAVE or self.counts.algo_step == cfg.A_FINISHED:
+        elif (
+            self.counts.algo_step == cfg.A_MODIFY
+            or self.counts.algo_step == cfg.A_SAVE
+            or self.counts.algo_step == cfg.A_FINISHED
+        ):
             return self.counts.chunk_m_max
         else:
             # TODO
@@ -77,7 +80,9 @@ class MetaInformation():
     def update_estimated_time(self):
         self.timer.update_estimated_time(
             self.counts,
-            self.water_blocks.get() == 1 or self.air_pockets.get() == 1 or self.repl_blocks.get() == 1
+            self.water_blocks.get() == 1
+            or self.air_pockets.get() == 1
+            or self.repl_blocks.get() == 1,
         )
 
     def get_tunnel_start(self):
@@ -86,8 +91,8 @@ class MetaInformation():
     def get_tunnel_end(self):
         return [400, 90, 250]
 
-class Counts():
 
+class Counts:
     def __init__(self):
         self.algo_step = 0
         self.algo_step_max = cfg.A_FINISHED
@@ -95,32 +100,32 @@ class Counts():
         self.file_count = 0
         self.file_count_max = 1
 
-        self.chunks_c = Value('i', 0)
-        self.label_i = Value('i', 0)
-        self.chunks_m = Value('i', 0)
+        self.chunks_c = Value("i", 0)
+        self.label_i = Value("i", 0)
+        self.chunks_m = Value("i", 0)
         self.chunk_c_max = cfg.REGION_C_X * cfg.REGION_C_Z
-        self.label_i_max = Value('i', 500)
+        self.label_i_max = Value("i", 500)
         self.chunk_m_max = cfg.REGION_C_X * cfg.REGION_C_Z
 
-        self.changed_air = Value('i', 0)
-        self.changed_water = Value('i', 0)
-        self.changed_repl = Value('i', 0)
+        self.changed_air = Value("i", 0)
+        self.changed_water = Value("i", 0)
+        self.changed_repl = Value("i", 0)
 
-class Timer():
 
+class Timer:
     def __init__(self):
         self.start_ms = 0
         self.end_ms = 0
 
-        self.start2_ms = Value('i', 0)
-        self.end2_ms = Value('i', 0)
+        self.start2_ms = Value("i", 0)
+        self.end2_ms = Value("i", 0)
 
-        self.elapsed_c_time = Value('f', 0.0)
-        self.elapsed_i_time = Value('f', 0.0)
+        self.elapsed_c_time = Value("f", 0.0)
+        self.elapsed_i_time = Value("f", 0.0)
         self.elapsed_m_time = 0
         # self.t_per_c_chunk = 0.1
-        self.t_per_c_chunk = Value('f', 0.075)
-        self.t_per_i_label = Value('f', 0.12)
+        self.t_per_c_chunk = Value("f", 0.075)
+        self.t_per_i_label = Value("f", 0.12)
         self.t_per_m_chunk = 0.5
 
         self.estimated_time = 0
@@ -129,16 +134,19 @@ class Timer():
         remaining_files = counts.file_count_max - counts.file_count
 
         elems = counts.chunks_c.value if counts.algo_step >= cfg.A_CLASSIFY else 0
-        t_c = ((counts.chunk_c_max - elems) \
-            + (remaining_files - 1) * counts.chunk_c_max) * self.t_per_c_chunk.value
+        t_c = (
+            (counts.chunk_c_max - elems) + (remaining_files - 1) * counts.chunk_c_max
+        ) * self.t_per_c_chunk.value
 
         elems = counts.label_i.value if counts.algo_step >= cfg.A_IDENTIFY else 0
-        t_i = ((counts.label_i_max.value - elems) \
-            + (remaining_files - 1) * counts.label_i_max.value) * self.t_per_i_label.value
+        t_i = (
+            (counts.label_i_max.value - elems) + (remaining_files - 1) * counts.label_i_max.value
+        ) * self.t_per_i_label.value
 
         elems = counts.chunks_m.value if counts.algo_step >= cfg.A_MODIFY else 0
-        t_m = ((counts.chunk_m_max - elems) \
-            + (remaining_files - 1) * counts.chunk_m_max) * self.t_per_m_chunk
+        t_m = (
+            (counts.chunk_m_max - elems) + (remaining_files - 1) * counts.chunk_m_max
+        ) * self.t_per_m_chunk
 
         t_s = cfg.T_SAVE * (0 if (counts.algo_step > cfg.A_SAVE) else 1) * remaining_files
 
@@ -161,12 +169,18 @@ class Timer():
 
     def update_c_elapsed(self, counts):
         self.elapsed_c_time.value += (self.end2_ms.value - self.start2_ms.value) / 1000
-        self.t_per_c_chunk.value = self.elapsed_c_time.value / (counts.chunk_c_max * counts.file_count + counts.chunks_c.value)
+        self.t_per_c_chunk.value = self.elapsed_c_time.value / (
+            counts.chunk_c_max * counts.file_count + counts.chunks_c.value
+        )
 
     def update_i_elapsed(self, counts):
         self.elapsed_i_time.value += (self.end2_ms.value - self.start2_ms.value) / 1000
-        self.t_per_i_label.value = self.elapsed_i_time.value / (counts.label_i_max.value * counts.file_count + counts.label_i.value)
+        self.t_per_i_label.value = self.elapsed_i_time.value / (
+            counts.label_i_max.value * counts.file_count + counts.label_i.value
+        )
 
     def update_m_elapsed(self, counts):
         self.elapsed_m_time += (self.end_ms - self.start_ms) / 1000
-        self.t_per_m_chunk = self.elapsed_m_time / (counts.chunk_m_max * counts.file_count + counts.chunks_m.value)
+        self.t_per_m_chunk = self.elapsed_m_time / (
+            counts.chunk_m_max * counts.file_count + counts.chunks_m.value
+        )
