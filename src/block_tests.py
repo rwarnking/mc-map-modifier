@@ -1,31 +1,121 @@
 # For globals
 import config as cfg
 
+###################################################################################################
+# Arrays of transparent block_ids
+###################################################################################################
+
 air_blocks = ["air", "cave_air"]
 
 water_blocks = ["water", "flowing_water"]
 
+lava_blocks = ["lava", "flowing_lava"]
+
+# TODO missing plants
+plants = [
+    "grass",
+    "fern",
+    "tall_grass",
+    "large_fern",
+    "kelp",
+    "kelp_plant",
+    "seagrass",
+    "tall_seagrass",
+]
+
+glass = [
+    "glass",
+    "glass_pane",
+    "black_stained_glass",
+    "black_stained_glass_pane",
+    "blue_stained_glass",
+    "blue_stained_glass_pane",
+    "brown_stained_glass",
+    "brown_stained_glass_pane",
+    "cyan_stained_glass",
+    "cyan_stained_glass_pane",
+    "gray_stained_glass",
+    "gray_stained_glass_pane",
+    "green_stained_glass",
+    "green_stained_glass_pane",
+    "light_blue_stained_glass",
+    "light_blue_stained_glass_pane",
+    "light_gray_stained_glass",
+    "light_gray_stained_glass_pane",
+    "lime_stained_glass",
+    "lime_stained_glass_pane",
+    "magenta_stained_glass",
+    "magenta_stained_glass_pane",
+    "orange_stained_glass",
+    "orange_stained_glass_pane",
+    "pink_stained_glass",
+    "pink_stained_glass_pane",
+    "purple_stained_glass",
+    "purple_stained_glass_pane",
+    "red_stained_glass",
+    "red_stained_glass_pane",
+    "white_stained_glass",
+    "white_stained_glass_pane",
+    "yellow_stained_glass",
+    "yellow_stained_glass_pane",
+]
+
+slabs = [
+    "acacia_slab",
+    "andesite_slab",
+    "birch_slab",
+    "blackstone_slab",
+    "brick_slab",
+    "cobblestone_slab",
+    "crimson_slab",
+    "cut_red_sandstone_slab",
+    "cut_sandstone_slab",
+    "dark_oak_slab",
+    "dark_prismarine_slab",
+    "diorite_slab",
+    "end_stone_brick_slab",
+    "granite_slab",
+    "jungle_slab",
+    "mossy_cobblestone_slab",
+    "mossy_stone_brick_slab",
+    "nether_brick_slab",
+    "oak_slab",
+    "petrified_oak_slab",
+    "polished_andesite_slab",
+    "polished_blackstone_brick_slab",
+    "polished_blackstone_slab",
+    "polished_diorite_slab",
+    "polished_granite_slab",
+    "prismarine_brick_slab",
+    "prismarine_slab",
+    "purpur_slab",
+    "quartz_slab",
+    "red_nether_brick_slab",
+    "red_sandstone_slab",
+    "sandstone_slab",
+    "smooth_quartz_slab",
+    "smooth_red_sandstone_slab",
+    "smooth_sandstone_slab",
+    "smooth_stone_slab",
+    "spruce_slab",
+    "stone_brick_slab",
+    "stone_slab",
+    "warped_slab",
+]
+
+
 # TODO is this needed ? remove unused and make own for lava
 # CARE: does not contain fences!
 # transparent_blocks = water_blocks + [
-transparent_blocks = [
-    "air",
-    "cave_air",
-    # all glass types
-    # "glass",
-    # "stained_glass",
-    # "glass_pane",
-    # "stained_glass_pane",
-    # all slabs
-    # "stone_slab",
-    # "stone_slab2",
-    # "wooden_slab",
-    # "purpur_slab",
-    "lava",
-    "flowing_lava"
-    # "water",
-    # "flowing_water"
-]
+transparent_blocks = water_blocks + lava_blocks
+
+all_transparent_blocks = water_blocks + lava_blocks + glass + slabs
+
+
+###################################################################################################
+# Arrays of solid block_ids
+###################################################################################################
+
 
 stone_blocks = [
     "stone",
@@ -98,7 +188,7 @@ solid_blocks = (
     + [
         "dirt",
         "coarse_dirt",
-        "grass",
+        "grass", # TODO this is grass but not dirt grass
         "farmland",
         "grass_path",
         "gravel",
@@ -151,17 +241,10 @@ underground_blocks = [
     "bedrock",
 ]
 
-# TODO missing plants
-plants = [
-    "grass",
-    "fern",
-    "tall_grass",
-    "large_fern",
-    "kelp",
-    "kelp_plant",
-    "seagrass",
-    "tall_seagrass",
-]
+
+###################################################################################################
+# Transparent functions
+###################################################################################################
 
 
 def is_air(block_id):
@@ -170,9 +253,6 @@ def is_air(block_id):
 
 def is_water(block_id):
     return block_id in water_blocks
-
-
-###################################################################################################
 
 
 def is_glass(block_id):
@@ -208,6 +288,9 @@ def is_transparent(block_id):
 
 
 ###################################################################################################
+# Solid functions
+###################################################################################################
+
 
 # bone_block
 # coral_block

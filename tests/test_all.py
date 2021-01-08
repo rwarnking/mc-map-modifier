@@ -57,7 +57,7 @@ class TestAll(unittest.TestCase):
         # TODO this does not work with the tests since this function does not exist in the lib
         # new_chunk.set_data(chunk.data)
 
-    def are_files_equal(S_DIR):
+    def are_files_equal(self, S_DIR):
         # TODO get the files
         filename = "r.0.0.mca"
         region = anvil.Region.from_file(S_DIR + "_copy" + "/" + filename)
