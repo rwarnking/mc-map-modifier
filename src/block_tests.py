@@ -188,7 +188,7 @@ solid_blocks = (
     + [
         "dirt",
         "coarse_dirt",
-        "grass", # TODO this is grass but not dirt grass
+        "grass_block",  # TODO is already cotained in blocks only needed for test map
         "farmland",
         "grass_path",
         "gravel",

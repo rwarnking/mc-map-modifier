@@ -4,15 +4,15 @@
 # https://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 import os
 import sys
+import anvil  # minecraft import
+import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-import unittest
-from tkinter import Tk #  Needed for metainfo
-
+import config as cfg
+from tkinter import Tk  # Needed for metainfo
 from copier import Copier
 from meta_information import MetaInformation
-import config as cfg
 
 
 class TestAll(unittest.TestCase):
