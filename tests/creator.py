@@ -5,7 +5,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../s
 
 import anvil  # minecraft import
 import config as cfg  # own import
-from anvil.errors import OutOfBoundsCoordinates  # TODO
 from block_tests import all_transparent_blocks, solid_blocks
 
 
@@ -27,14 +26,15 @@ class Creator:
         new_region.save(target_dir + "/" + filename)
         print("... finished")
 
-    def air_block_tests(self, new_region):
+    def air_block_tests(self, new_region, max_thickness=6):
         self.air = anvil.Block("minecraft", "air")
 
-        max_half_thickness = 4
+        max_half_thickness = max_thickness / 2 + 1
         g_x = max_half_thickness
         g_y = max_half_thickness
         g_z = max_half_thickness
-        for thickness in range(3, 7):
+        for thickness in range(3, max_thickness + 1):
+            # TODO use shape based approach?
             for size in range(1, thickness - 1):
                 for ID in solid_blocks + all_transparent_blocks:
                     if g_z > cfg.REGION_B_Z - max_half_thickness - thickness - 1:
@@ -59,28 +59,28 @@ class Creator:
         shapes = [
             [[[[1]]]],
             [
-                [[[1, 1], [0, 0]], [[0, 0], [0, 0]],],
-                [[[0, 0], [1, 1]], [[0, 0], [0, 0]],],
-                [[[1, 0], [1, 0]], [[0, 0], [0, 0]],],
-                [[[0, 1], [0, 1]], [[0, 0], [0, 0]],],
-                [[[1, 0], [0, 1]], [[0, 0], [0, 0]],],
-                [[[0, 1], [1, 0]], [[0, 0], [0, 0]],],
-
-                [[[0, 0], [0, 0]], [[1, 1], [0, 0]],],
-                [[[0, 0], [0, 0]], [[0, 0], [1, 1]],],
-                [[[0, 0], [0, 0]], [[1, 0], [1, 0]],],
-                [[[0, 0], [0, 0]], [[0, 1], [0, 1]],],
-                [[[0, 0], [0, 0]], [[1, 0], [0, 1]],],
-                [[[0, 0], [0, 0]], [[0, 1], [1, 0]],],
-
-                [[[0, 1], [0, 0]], [[1, 0], [0, 0]],],
-                [[[1, 0], [0, 0]], [[0, 1], [0, 0]],],
-                [[[0, 0], [0, 1]], [[0, 0], [1, 0]],],
-                [[[0, 0], [1, 0]], [[0, 0], [0, 1]],],
-                [[[1, 0], [0, 0]], [[0, 0], [0, 1]],],
-                [[[0, 1], [0, 0]], [[0, 0], [1, 0]],],
-                [[[0, 0], [0, 1]], [[1, 0], [0, 0]],],
-                [[[0, 0], [1, 0]], [[0, 1], [0, 0]],],
+                [[[1, 1], [0, 0]], [[0, 0], [0, 0]], ],
+                [[[0, 0], [1, 1]], [[0, 0], [0, 0]], ],
+                [[[1, 0], [1, 0]], [[0, 0], [0, 0]], ],
+                [[[0, 1], [0, 1]], [[0, 0], [0, 0]], ],
+                [[[1, 0], [0, 1]], [[0, 0], [0, 0]], ],
+                [[[0, 1], [1, 0]], [[0, 0], [0, 0]], ],
+                # TODO
+                [[[0, 0], [0, 0]], [[1, 1], [0, 0]], ],
+                [[[0, 0], [0, 0]], [[0, 0], [1, 1]], ],
+                [[[0, 0], [0, 0]], [[1, 0], [1, 0]], ],
+                [[[0, 0], [0, 0]], [[0, 1], [0, 1]], ],
+                [[[0, 0], [0, 0]], [[1, 0], [0, 1]], ],
+                [[[0, 0], [0, 0]], [[0, 1], [1, 0]], ],
+                # TODO
+                [[[0, 1], [0, 0]], [[1, 0], [0, 0]], ],
+                [[[1, 0], [0, 0]], [[0, 1], [0, 0]], ],
+                [[[0, 0], [0, 1]], [[0, 0], [1, 0]], ],
+                [[[0, 0], [1, 0]], [[0, 0], [0, 1]], ],
+                [[[1, 0], [0, 0]], [[0, 0], [0, 1]], ],
+                [[[0, 1], [0, 0]], [[0, 0], [1, 0]], ],
+                [[[0, 0], [0, 1]], [[1, 0], [0, 0]], ],
+                [[[0, 0], [1, 0]], [[0, 1], [0, 0]], ],
             ],
             [
                 [
@@ -192,6 +192,7 @@ class Creator:
                 for k in range(size):
                     if shape[i][j][k] == 1:
                         region.set_block(block, x + i - l2, y + j - l2, z + k - l2)
+
 
 ###################################################################################################
 # Main

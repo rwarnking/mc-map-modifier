@@ -71,7 +71,7 @@ class Copier:
         if os.path.exists(src_dir):
             filelist = os.listdir(src_dir)
 
-        if filelist == None or len(filelist) == 0:
+        if filelist is None or len(filelist) == 0:
             messagebox.showinfo(
                 message="No files found! Select a different source path.", title="Error"
             )
