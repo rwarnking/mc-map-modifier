@@ -48,16 +48,15 @@ class TestAll(unittest.TestCase):
             self.assertTrue(os.path.exists(meta_info.target_dir.get()))
             self.assertTrue(self.are_files_equal(S_DIR))
 
-            print(os.listdir(meta_info.target_dir.get()))
-            self.assertEqual(2, len(os.listdir(meta_info.target_dir.get())))
-
         # TODO this is used to trigger an error in the testing
         # a better way would be to print directly to the github log instead of the stdout
-        self.assertEqual(2, 3)
+        # self.assertEqual(2, 3)
 
         # IMPORTANT
         # TODO this does not work with the tests since this function does not exist in the lib
         # new_chunk.set_data(chunk.data)
+
+        # TODO push test map and result map
 
     def are_files_equal(self, S_DIR):
         # TODO get the files

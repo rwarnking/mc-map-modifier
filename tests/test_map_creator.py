@@ -5,10 +5,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../s
 
 import anvil  # minecraft import
 import config as cfg  # own import
+from shape_generator import ShapeGenerator
 from block_tests import all_transparent_blocks, solid_blocks
 
 
-class Creator:
+class TestMapCreator:
+    def __init__(self):
+        self.shape_generator = ShapeGenerator()
+
     def create_test_map(self, filename="r1.0.0.mca"):
         print("running ...")
         target_dir = os.path.dirname(os.path.abspath(__file__)) + "/region_files_original"
@@ -19,7 +23,7 @@ class Creator:
         # Create a new region with the `EmptyRegion` class at region coords
         new_region = anvil.EmptyRegion(r_x, r_z)
 
-        self.air_block_tests(new_region)
+        # self.air_block_tests(new_region)
         self.water_block_tests(new_region)
         self.repl_block_tests(new_region)
 
@@ -55,42 +59,11 @@ class Creator:
             g_x = max_half_thickness
             g_z = g_z + thickness + 1
 
-    def get_shape(self, num_blocks):
-        shapes = [
-            [[[[1]]]],
-            [
-                [[[1, 1], [0, 0]], [[0, 0], [0, 0]], ],
-                [[[0, 0], [1, 1]], [[0, 0], [0, 0]], ],
-                [[[1, 0], [1, 0]], [[0, 0], [0, 0]], ],
-                [[[0, 1], [0, 1]], [[0, 0], [0, 0]], ],
-                [[[1, 0], [0, 1]], [[0, 0], [0, 0]], ],
-                [[[0, 1], [1, 0]], [[0, 0], [0, 0]], ],
-                # TODO
-                [[[0, 0], [0, 0]], [[1, 1], [0, 0]], ],
-                [[[0, 0], [0, 0]], [[0, 0], [1, 1]], ],
-                [[[0, 0], [0, 0]], [[1, 0], [1, 0]], ],
-                [[[0, 0], [0, 0]], [[0, 1], [0, 1]], ],
-                [[[0, 0], [0, 0]], [[1, 0], [0, 1]], ],
-                [[[0, 0], [0, 0]], [[0, 1], [1, 0]], ],
-                # TODO
-                [[[0, 1], [0, 0]], [[1, 0], [0, 0]], ],
-                [[[1, 0], [0, 0]], [[0, 1], [0, 0]], ],
-                [[[0, 0], [0, 1]], [[0, 0], [1, 0]], ],
-                [[[0, 0], [1, 0]], [[0, 0], [0, 1]], ],
-                [[[1, 0], [0, 0]], [[0, 0], [0, 1]], ],
-                [[[0, 1], [0, 0]], [[0, 0], [1, 0]], ],
-                [[[0, 0], [0, 1]], [[1, 0], [0, 0]], ],
-                [[[0, 0], [1, 0]], [[0, 1], [0, 0]], ],
-            ],
-            [
-                [
-                    [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-                    [[0, 0, 0], [0, 1, 0], [0, 0, 0]],
-                    [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-                ],
-            ],
-        ]
-        return shapes[num_blocks - 1]
+    def get_shape(self, dim_size, num_blocks=-1):
+        # TODO or num_blocks == 3
+        if num_blocks == -1 or num_blocks == 3:
+            num_blocks = dim_size * dim_size * dim_size
+        return self.shape_generator.get_shape(dim_size, num_blocks)
 
     def water_block_tests(self, new_region):
         self.water = anvil.Block("minecraft", "water")
@@ -104,7 +77,7 @@ class Creator:
         g_z = max_half_thickness
 
         for num_blocks in range(1, 4):
-            for shape in self.get_shape(num_blocks):
+            for shape in self.get_shape(num_blocks, num_blocks):
                 for ID in solid_blocks + all_transparent_blocks:
                     if g_y > cfg.REGION_B_Y - max_half_thickness - thickness - 1:
                         print("To many blocks")
@@ -198,5 +171,5 @@ class Creator:
 # Main
 ###################################################################################################
 if __name__ == "__main__":
-    c = Creator()
+    c = TestMapCreator()
     c.create_test_map()
