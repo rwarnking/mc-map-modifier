@@ -115,11 +115,16 @@ class TestMapCreator:
         # Create a new region with the `EmptyRegion` class at region coords
         new_region = anvil.EmptyRegion(r_x, r_z)
 
+        print("... starting airblock tests ...")
         self.air_block_tests(new_region)
+        print("... starting waterblock tests ...")
         self.pos.reset_no_y(5, 7)
         self.water_block_tests(new_region)
-        # self.repl_block_tests(new_region)
+        print("... starting replblock tests ...")
+        self.pos.reset_no_y(3, 6)
+        self.repl_block_tests(new_region)
 
+        print("... saving ...")
         new_region.save(target_dir + "/" + filename)
         print("... finished")
 
@@ -136,8 +141,6 @@ class TestMapCreator:
         self.air = anvil.Block("minecraft", "air")
 
         for width in range(self.pos.max_width, self.pos.min_width - 1, -1):
-            print(width)
-
             # TODO use shape based approach?
             for size in range(1, width - 1):
                 for ID in solid_blocks + all_transparent_blocks:
@@ -172,11 +175,19 @@ class TestMapCreator:
             self.pos.next_y(True)
 
     def repl_block_tests(self, new_region):
-        return True
+        for num_blocks in range(self.pos.max_width, self.pos.min_width - 1, -1):
+            for ID in solid_blocks + all_transparent_blocks:
+                b = anvil.Block("minecraft", ID)
+                self.set_solid_cube(new_region, b)
+
+                self.pos.next_pos()
+            self.pos.decrease_width()
+            self.pos.next_y(True)
 
     def set_air_cube(self, region: anvil.EmptyRegion, block: anvil.Block, thickness, size):
         x, y, z = self.pos.xyz.x, self.pos.xyz.y, self.pos.xyz.z
 
+        # TODO use halfwidth from self.pos
         left = int(thickness / 2.0)
         right = left
         if thickness % 2 == 0:
@@ -198,6 +209,7 @@ class TestMapCreator:
     def set_water_cube(self, region: anvil.EmptyRegion, block: anvil.Block, num_blocks, shape):
         x, y, z = self.pos.xyz.x, self.pos.xyz.y, self.pos.xyz.z
 
+        # TODO use halfwidth from self.pos
         # inside dimensions
         i_left = int(num_blocks / 2.0)
         i_right = i_left
@@ -236,6 +248,18 @@ class TestMapCreator:
                     if shape[i][j][k] == 1:
                         region.set_block(block, x + i - i_left, y + j - i_left, z + k - i_left)
 
+    def set_solid_cube(self, region: anvil.EmptyRegion, block: anvil.Block):
+        x, y, z = self.pos.xyz.x, self.pos.xyz.y, self.pos.xyz.z
+
+        # TODO use halfwidth from self.pos
+        right = int(self.pos.now_width / 2.0)
+        left = -right
+        if self.pos.now_width % 2 == 0:
+            right = right - 1
+        for i in range(left, right + 1):
+            for j in range(left, right + 1):
+                for k in range(left, right + 1):
+                    region.set_block(block, x + i, y + j, z + k)
 
 ###################################################################################################
 # Main
