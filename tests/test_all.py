@@ -7,11 +7,9 @@ import sys
 import unittest
 
 import anvil  # minecraft import
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
-
 from tkinter import Tk  # Needed for metainfo
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 import config as cfg
 from copier import Copier
 from meta_information import MetaInformation

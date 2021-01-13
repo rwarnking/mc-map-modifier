@@ -1,19 +1,111 @@
 import os
 import sys
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
+import math
 
 import anvil  # minecraft import
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 import config as cfg  # own import
-from shape_generator import ShapeGenerator
 from block_tests import all_transparent_blocks, solid_blocks
+from shape_generator import ShapeGenerator
+
+
+class Vector:
+    def __init__(self, x: int=0, y: int=0, z:int=0):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    @classmethod
+    def from_one_val(cls, val: int):
+        return cls(val, val, val)
+
+    @classmethod
+    def from_array(cls, xyz: [int]):
+        return cls(x[0], y[1], z[2])
+
+    def add_vec(self, vec: "Vector"):
+        self.x += vec.x
+        self.y += vec.y
+        self.z += vec.z
+
+
+class BlockPosition:
+    def __init__(self, min_w: int, max_w: int, x: int=None, y: int=None, z:int=None):
+        self.dist = 1
+        self.min_width = min_w
+        self.max_width = max_w
+        self.now_width = max_w
+        self.update_width()
+
+        if x is None or y is None or z is None:
+            self.xyz = Vector.from_one_val(self.half_width)
+        else:
+            self.xyz = Vector(x, y, z)
+
+    @classmethod
+    def from_one_coord(cls, width: int, val: int):
+        return cls(width, val, val, val)
+
+    def reset_no_y(self, min_w: int, max_w: int):
+        self.min_width = min_w
+        self.max_width = max_w
+        self.now_width = max_w
+        self.update_width()
+        self.xyz = Vector(self.half_width, self.xyz.y, self.half_width)
+        self.next_y()
+
+    def increase_width(self, amount: int=1):
+        self.decrease_width(amount)
+
+    def decrease_width(self, amount: int=-1):
+        self.now_width += amount
+        self.update_width()
+
+    def update_width(self):
+        self.half_width = math.ceil((self.now_width + 1) / 2)
+        self.limit = Vector(
+            cfg.REGION_B_X - self.now_width - self.half_width - self.dist,
+            cfg.REGION_B_Y - self.now_width - self.half_width - self.dist,
+            cfg.REGION_B_Z - self.now_width - self.half_width - self.dist
+        )
+
+    def next_pos(self):
+        if self.xyz.x < self.limit.x:
+            self.next_x()
+        elif self.xyz.z < self.limit.z:
+            self.next_z()
+        elif self.xyz.y < self.limit.y:
+            self.next_y()
+        else:
+            raise Exception("No positions left!")
+
+    def next_x(self):
+        self.xyz.x += self.now_width + self.dist
+
+    def next_y(self, add: bool=False):
+        self.xyz.x = self.half_width
+        self.xyz.y += self.now_width + self.dist
+        self.xyz.z = self.half_width
+
+        if add and self.now_width % 2 == 0:
+            self.xyz.y += 1
+        if self.xyz.y > self.limit.y:
+            raise Exception("Y border value reached!")
+
+    def next_z(self):
+        self.xyz.x = self.half_width
+        self.xyz.z += self.now_width + self.dist
 
 
 class TestMapCreator:
     def __init__(self):
         self.shape_generator = ShapeGenerator()
+        min_cube_width = 3
+        max_cube_width = 7
+        self.pos = BlockPosition(min_cube_width, max_cube_width)
 
-    def create_test_map(self, filename="r1.0.0.mca"):
+    def create_test_map(self, filename: str="r1.0.0.mca"):
         print("running ...")
         target_dir = os.path.dirname(os.path.abspath(__file__)) + "/region_files_original"
         end = filename.split(".")
@@ -23,148 +115,126 @@ class TestMapCreator:
         # Create a new region with the `EmptyRegion` class at region coords
         new_region = anvil.EmptyRegion(r_x, r_z)
 
-        # self.air_block_tests(new_region)
+        self.air_block_tests(new_region)
+        self.pos.reset_no_y(5, 7)
         self.water_block_tests(new_region)
-        self.repl_block_tests(new_region)
+        # self.repl_block_tests(new_region)
 
         new_region.save(target_dir + "/" + filename)
         print("... finished")
 
-    def air_block_tests(self, new_region, max_thickness=6):
+    def air_block_tests(self, new_region: anvil.EmptyRegion):
+        """Adds test cubes for all thicknesses to the passed region.
+
+        Parameters
+        ----------
+        new_region : anvil.EmptyRegion
+            The region the tests should be added to
+        max_thickness : int, optional
+            The maximum thickness a test should have
+        """
         self.air = anvil.Block("minecraft", "air")
 
-        max_half_thickness = max_thickness / 2 + 1
-        g_x = max_half_thickness
-        g_y = max_half_thickness
-        g_z = max_half_thickness
-        for thickness in range(3, max_thickness + 1):
+        for width in range(self.pos.max_width, self.pos.min_width - 1, -1):
+            print(width)
+
             # TODO use shape based approach?
-            for size in range(1, thickness - 1):
+            for size in range(1, width - 1):
                 for ID in solid_blocks + all_transparent_blocks:
-                    if g_z > cfg.REGION_B_Z - max_half_thickness - thickness - 1:
-                        print("To many blocks")
-                        break
-
                     b = anvil.Block("minecraft", ID)
-                    self.set_air_cube(new_region, g_x, g_y, g_z, b, thickness, size)
+                    self.set_air_cube(new_region, b, width, size)
 
-                    if g_x < cfg.REGION_B_X - max_half_thickness - thickness - 1:
-                        g_x = g_x + thickness + 1
-                    elif g_z < cfg.REGION_B_Z - max_half_thickness - thickness - 1:
-                        g_x = max_half_thickness
-                        g_z = g_z + thickness + 1
+                    self.pos.next_pos()
+                self.pos.next_z()
+            self.pos.decrease_width()
+            self.pos.next_y(True)
 
-                g_x = max_half_thickness
-                g_z = g_z + thickness + 1
-            g_x = max_half_thickness
-            g_z = g_z + thickness + 1
-
-    def get_shape(self, dim_size, num_blocks=-1):
+    def get_shape(self, dim_size: int, num_blocks: int=-1):
         # TODO or num_blocks == 3
         if num_blocks == -1 or num_blocks == 3:
             num_blocks = dim_size * dim_size * dim_size
         return self.shape_generator.get_shape(dim_size, num_blocks)
 
-    def water_block_tests(self, new_region):
+    def water_block_tests(self, new_region: anvil.EmptyRegion):
         self.water = anvil.Block("minecraft", "water")
         self.glass = anvil.Block("minecraft", "glass")
         self.stone = anvil.Block("minecraft", "stone")
 
-        thickness = 8
-        max_half_thickness = int(thickness / 2)
-        g_x = max_half_thickness
-        g_y = max_half_thickness + 10
-        g_z = max_half_thickness
-
-        for num_blocks in range(1, 4):
+        for num_blocks in range(self.pos.max_width - 4, self.pos.min_width - 1 - 4, -1):
             for shape in self.get_shape(num_blocks, num_blocks):
                 for ID in solid_blocks + all_transparent_blocks:
-                    if g_y > cfg.REGION_B_Y - max_half_thickness - thickness - 1:
-                        print("To many blocks")
-                        break
-
                     b = anvil.Block("minecraft", ID)
-                    self.set_water_cube(new_region, g_x, g_y, g_z, b, num_blocks, shape)
+                    self.set_water_cube(new_region, b, num_blocks, shape)
 
-                    if g_x < cfg.REGION_B_X - max_half_thickness - thickness - 1:
-                        g_x = g_x + thickness + 1
-                    elif g_z < cfg.REGION_B_Z - max_half_thickness - thickness - 1:
-                        g_x = max_half_thickness
-                        g_z = g_z + thickness + 1
-
-                g_x = max_half_thickness
-                g_z = g_z + thickness + 1
-                if g_z > cfg.REGION_B_Z - max_half_thickness - thickness - 1:
-                    g_x = max_half_thickness
-                    g_y = g_y + thickness + 1
-                    g_z = max_half_thickness
-            g_x = max_half_thickness
-            g_y = g_y + thickness + 1
-            g_z = max_half_thickness
+                    self.pos.next_pos()
+                self.pos.next_z()
+            self.pos.decrease_width()
+            self.pos.next_y(True)
 
     def repl_block_tests(self, new_region):
         return True
 
-    def set_air_cube(self, region, x, y, z, block, thickness, size):
-        l = int(thickness / 2.0)
-        r = l
+    def set_air_cube(self, region: anvil.EmptyRegion, block: anvil.Block, thickness, size):
+        x, y, z = self.pos.xyz.x, self.pos.xyz.y, self.pos.xyz.z
+
+        left = int(thickness / 2.0)
+        right = left
         if thickness % 2 == 0:
-            r = r - 1
-        for i in range(-l, r + 1):
-            for j in range(-l, r + 1):
-                for k in range(-l, r + 1):
+            right = right - 1
+        for i in range(-left, right + 1):
+            for j in range(-left, right + 1):
+                for k in range(-left, right + 1):
                     region.set_block(block, x + i, y + j, z + k)
 
-        l = int(size / 2.0)
-        r = l
+        left = int(size / 2.0)
+        right = left
         if size % 2 == 0:
-            r = r - 1
-        for i in range(-l, r + 1):
-            for j in range(-l, r + 1):
-                for k in range(-l, r + 1):
+            right = right - 1
+        for i in range(-left, right + 1):
+            for j in range(-left, right + 1):
+                for k in range(-left, right + 1):
                     region.set_block(self.air, x + i, y + j, z + k)
 
-    def set_water_cube(self, region, x, y, z, block, num_blocks, shape):
-        l2 = int(num_blocks / 2.0)
-        r2 = l2
-        l = int(num_blocks / 2.0) + 2
-        r = l
+    def set_water_cube(self, region: anvil.EmptyRegion, block: anvil.Block, num_blocks, shape):
+        x, y, z = self.pos.xyz.x, self.pos.xyz.y, self.pos.xyz.z
+
+        # inside dimensions
+        i_left = int(num_blocks / 2.0)
+        i_right = i_left
+        # total dimensions
+        left = i_left + 2
+        right = left
 
         if num_blocks % 2 == 0:
-            r = r - 1
-            r2 = r2 - 1
+            right = right - 1
+            i_right = i_right - 1
 
-        for i in range(-l, r + 1):
-            for k in range(-l, r + 1):
-                region.set_block(self.stone, x + i, y - l, z + k)
-                region.set_block(self.stone, x + i, y - l - 1, z + k)
+        for i in range(-left, right + 1):
+            for k in range(-left, right + 1):
+                region.set_block(self.stone, x + i, y - left, z + k)
+                region.set_block(self.stone, x + i, y - left - 1, z + k)
 
-        for j in range(-l + 1, r):
-            for i in range(-l, r + 1):
-                region.set_block(self.glass, x + i, y + j, z - l)
-                region.set_block(self.glass, x + i, y + j, z + r)
+        for j in range(-left + 1, right):
+            for i in range(-left, right + 1):
+                region.set_block(self.glass, x + i, y + j, z - left)
+                region.set_block(self.glass, x + i, y + j, z + right)
 
-            for k in range(-l, r + 1):
-                region.set_block(self.glass, x - l, y + j, z + k)
-                region.set_block(self.glass, x + r, y + j, z + k)
+            for k in range(-left, right + 1):
+                region.set_block(self.glass, x - left, y + j, z + k)
+                region.set_block(self.glass, x + right, y + j, z + k)
 
-        for i in range(-l2 - 1, r2 + 2):
-            for j in range(-l2 - 1, r2 + 2):
-                for k in range(-l2 - 1, r2 + 2):
+        for i in range(-i_left - 1, i_right + 2):
+            for j in range(-i_left - 1, i_right + 2):
+                for k in range(-i_left - 1, i_right + 2):
                     region.set_block(self.water, x + i, y + j, z + k)
 
         # TODO this should be the same value as num_blocks
         size = len(shape)
-        # print(size)
-        # print(shape)
-        # print(shape[0])
-        # print(shape[0][0])
-        # print(shape[0][0][0])
         for i in range(size):
             for j in range(size):
                 for k in range(size):
                     if shape[i][j][k] == 1:
-                        region.set_block(block, x + i - l2, y + j - l2, z + k - l2)
+                        region.set_block(block, x + i - i_left, y + j - i_left, z + k - i_left)
 
 
 ###################################################################################################

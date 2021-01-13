@@ -39,7 +39,7 @@ class ShapeGenerator:
             last_i = last_i + (1 << i)
         # Add first entry
         for shift in range(bits):
-            arr[bits - 1 - shift] = ((last_i & 1 << shift) >> shift)
+            arr[bits - 1 - shift] = (last_i & 1 << shift) >> shift
         shape_list.append(self.convert(arr, dim_size))
         # Determine last entry
         for i in range(1, num_blocks + 1):
@@ -51,7 +51,7 @@ class ShapeGenerator:
             tmp = (last_i | (last_i - 1)) + 1
             next_i = tmp | ((int((tmp & -tmp) / (last_i & -last_i)) >> 1) - 1)
             for shift in range(bits):
-                arr[bits - 1 - shift] = ((next_i & 1 << shift) >> shift)
+                arr[bits - 1 - shift] = (next_i & 1 << shift) >> shift
             shape_list.append(self.convert(arr, dim_size))
             last_i = next_i
 
