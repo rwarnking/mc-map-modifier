@@ -11,7 +11,7 @@ water_blocks = ["water", "flowing_water"]
 
 lava_blocks = ["lava", "flowing_lava"]
 
-# TODO missing plants
+# TODO check for missing plants like wheat
 plants = [
     "grass",
     "fern",
@@ -21,6 +21,28 @@ plants = [
     "kelp_plant",
     "seagrass",
     "tall_seagrass",
+    "allium",
+    "azure_bluet",
+    "bamboo",
+    "blue_orchid",
+    "brown_mushroom",
+    "cornflower",
+    "crimson_fungus",
+    "dandelion",
+    "dead_bush",
+    "lilac",
+    "lily_of_the_valley",
+    "orange_tulip",
+    "oxeye_daisy",
+    "peony",
+    "pink_tulip",
+    "poppy",
+    "red_mushroom",
+    "red_tulip",
+    "rose_bush",
+    "warped_fungus",
+    "white_tulip",
+    "wither_rose",
 ]
 
 glass = [
@@ -103,13 +125,39 @@ slabs = [
     "warped_slab",
 ]
 
+fences = [
+    "acacia_fence",
+    "acacia_fence_gate",
+    "birch_fence",
+    "birch_fence_gate",
+    "crimson_fence",
+    "crimson_fence_gate",
+    "dark_oak_fence",
+    "dark_oak_fence_gate",
+    "jungle_fence",
+    "jungle_fence_gate",
+    "nether_brick_fence",
+    "oak_fence",
+    "oak_fence_gate",
+    "spruce_fence",
+    "spruce_fence_gate",
+    "warped_fence",
+    "warped_fence_gate",
+]
 
-# TODO is this needed ? remove unused and make own for lava
-# CARE: does not contain fences!
-# transparent_blocks = water_blocks + [
-transparent_blocks = water_blocks + lava_blocks
+leaves = [
+    "acacia_leaves",
+    "birch_leaves",
+    "dark_oak_leaves",
+    "jungle_leaves",
+    "oak_leaves",
+    "spruce_leaves",
+]
 
-all_transparent_blocks = water_blocks + lava_blocks + glass + slabs
+
+fluid_blocks = water_blocks + lava_blocks
+
+transparent_blocks = fluid_blocks + glass + slabs + fences + leaves
 
 
 ###################################################################################################
@@ -152,7 +200,7 @@ job_site_blocks = [
     "loom",
     "smithing_table",
     "smoker",
-    "dispenser",  # TODO
+    "dispenser",
     "dropper",
     "observer",
     "lodestone",
@@ -181,7 +229,7 @@ nether_blocks = [
     "soul_soil",
 ]
 
-# TODO what about ice and blue ice
+# TODO what about ice and blue ice are they transparent?
 solid_blocks = (
     stone_blocks
     + sandstone_blocks
@@ -273,12 +321,12 @@ def is_slab(block_id):
 
 
 def is_plant(block_id):
-    return block_id in plants
+    return block_id in plants or "sapling" in block_id
 
 
 def is_transparent(block_id):
     return (
-        block_id in transparent_blocks
+        block_id in fluid_blocks
         or is_leave(block_id)
         or is_glass(block_id)
         or is_fence(block_id)
