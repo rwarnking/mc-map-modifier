@@ -1,6 +1,5 @@
 import math
 
-import math_helper as m_hp
 from integer import IntBuilder
 
 
@@ -43,6 +42,11 @@ class ShapeGenerator:
             raise Exception("num_blocks must be greater than 0")
 
         bits = dim_size * dim_size * dim_size
+
+        if num_blocks == bits:
+            i = self.int_builder.get_all_bits_set(bits)
+            return [self.convert_i_to_shape(i, bits, dim_size)]
+
         int_list = self.int_builder.get_k_combs_n_bits(bits, num_blocks, n)
         return [self.convert_i_to_shape(i, bits, dim_size) for i in int_list]
 

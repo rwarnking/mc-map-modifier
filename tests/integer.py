@@ -12,9 +12,11 @@ def compare_unsigned(x: int, y: int):
     else:
         return 0
 
+
 def lowest_one_bit(x: int):
     b = (x & -x).bit_length()
     return 1 << (b - 1)
+
 
 def number_trailing_zeros(x: int):
     count = 0
@@ -26,9 +28,12 @@ def number_trailing_zeros(x: int):
 
 
 class IntBuilder:
-    def __init__(self):
+    def __init__(self, size: int = 4):
+        if size > 4:
+            raise ValueError("To many combinations for random.sample().")
+
         # A lookup table to see how many combinations preceeded this one
-        self.size = 64  # 4*4*4
+        self.size = size * size * size
         self.lookup_table_combination_pos = np.zeros((self.size, self.size))
         # The number of possible combinations with i bits
         self.nbr_combinations = np.zeros(self.size + 1)
@@ -119,6 +124,8 @@ class IntBuilder:
         shape_list = []
         if n > bits:
             raise Exception("More blocks then positions!")
+        if bits > self.size:
+            raise Exception("To many combinations for random.sample(). (to many bits)")
 
         # Calculate the amount of possible combinations
         comb_count = m_hp.n_choose_r(bits, n)

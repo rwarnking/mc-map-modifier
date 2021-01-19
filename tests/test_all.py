@@ -4,6 +4,7 @@
 # https://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 import unittest
 from tkinter import Tk  # Needed for metainfo

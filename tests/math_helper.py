@@ -1,6 +1,7 @@
 import operator as op
-import numpy as np
 from functools import reduce
+
+import numpy as np
 
 
 def n_choose_r(n: int, r: int):
@@ -18,7 +19,7 @@ def gauss_curve_integral_1(pos: int, max_val: int):
     https://en.wikipedia.org/wiki/Gaussian_function
     """
     center = max_val / 2
-    std_dev = max_val / 8
+    std_dev = 5
     # Used to generate an integral of 1
     height = 1 / (std_dev * np.sqrt(2 * np.pi))
 

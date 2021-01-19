@@ -6,6 +6,7 @@ import anvil  # minecraft import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 import config as cfg  # own import
 import math_helper as m_hp
+from typing import Callable, List
 from block_tests import solid_blocks, transparent_blocks
 from shape_generator import ShapeGenerator
 
@@ -61,11 +62,7 @@ class BlockPosition:
     def update_width(self):
         self.half_width = int(self.now_width / 2)
         dist = self.now_width + self.half_width + self.dist + self.dist + 1
-        self.limit = Vector(
-            cfg.REGION_B_X - dist,
-            cfg.REGION_B_Y - dist,
-            cfg.REGION_B_Z - dist,
-        )
+        self.limit = Vector(cfg.REGION_B_X - dist, cfg.REGION_B_Y - dist, cfg.REGION_B_Z - dist)
 
     def next_pos(self):
         if self.xyz.x < self.limit.x:
@@ -102,6 +99,11 @@ class TestMapCreator:
         max_cube_width = 6
         self.pos = BlockPosition(min_cube_width, max_cube_width)
 
+        self.air = anvil.Block("minecraft", "air")
+        self.water = anvil.Block("minecraft", "water")
+        self.glass = anvil.Block("minecraft", "glass")
+        self.stone = anvil.Block("minecraft", "stone")
+
     def create_test_map(self, filename: str = "r1.0.0.mca"):
         print("running ...")
         target_dir = os.path.dirname(os.path.abspath(__file__)) + "/region_files_original"
@@ -113,13 +115,16 @@ class TestMapCreator:
         new_region = anvil.EmptyRegion(r_x, r_z)
 
         print("... generating airblock tests ...")
-        self.air_block_tests(new_region)
+        set_func = self.set_air_cube
+        self.set_test_blocks(new_region, set_func, 2)
         print("... generating waterblock tests ...")
         self.pos.reset_no_y(5, 7)
-        self.water_block_tests(new_region)
+        set_func = self.set_water_cube
+        self.set_test_blocks(new_region, set_func, 4)
         print("... generating replblock tests ...")
         self.pos.reset_no_y(3, 6)
-        self.repl_block_tests(new_region)
+        set_func = self.set_solid_cube
+        self.set_test_blocks(new_region, set_func)
 
         print("... saving ...")
         new_region.save(target_dir + "/" + filename)
@@ -131,15 +136,17 @@ class TestMapCreator:
             max_elems = cfg.REGION_B_X * cfg.REGION_B_Z
             max_elems /= (self.pos.now_width + 1) * (self.pos.now_width + 1)
             max_elems /= len(solid_blocks) + len(transparent_blocks)
+
             count = dim_size * dim_size * dim_size
             shapes = self.shape_generator.get_n_shapes(dim_size, count, 1)
 
-            for i in range(1, count):
-                # Get the amount of elems that should be used for this shapetype
-                # Uses normal distribution and does not produce more than max_elems
-                # TODO is not jet optimal since the total elem count is not equal to max_elems
-                elems = int(m_hp.gauss_curve_integral_1(i, count) * max_elems)
-                shapes += self.shape_generator.get_n_shapes(dim_size, i, elems)
+            if dim_size < 5:
+                for i in range(1, count):
+                    # Get the amount of elems that should be used for this shapetype
+                    # Uses normal distribution and does not produce more than max_elems
+                    # TODO is not jet optimal since the total elem count is not equal to max_elems
+                    elems = int(m_hp.gauss_curve_integral_1(i, count) * max_elems)
+                    shapes += self.shape_generator.get_n_shapes(dim_size, i, elems)
             return shapes
 
         if num_blocks > 2:
@@ -148,54 +155,41 @@ class TestMapCreator:
 
         return self.shape_generator.get_shapes(dim_size, num_blocks)
 
-    def air_block_tests(self, new_region: anvil.EmptyRegion):
+    def set_test_blocks(
+        self,
+        new_region: anvil.EmptyRegion,
+        cube_func: Callable[[anvil.EmptyRegion, anvil.Block, List[List[List[int]]]], None],
+        adj_w: int = 0
+    ):
         """Adds test cubes for all thicknesses to the passed region.
 
         Parameters
         ----------
         new_region : anvil.EmptyRegion
             The region the tests should be added to
-        max_thickness : int, optional
-            The maximum thickness a test should have
+        cube_func : Callable[[anvil.EmptyRegion, anvil.Block, List[List[List[int]]]]
+            The function responsible for placing the cubes
+        adj_w : int, optional
+            Adjustment of the width to allow for layers of blocks around the shapes
         """
-        self.air = anvil.Block("minecraft", "air")
-
-        for width in range(self.pos.max_width, self.pos.min_width - 1, -1):
-            for shape in self.get_shapes(width - 2):
+        for width in range(self.pos.max_width - adj_w, self.pos.min_width - 1 - adj_w, -1):
+            for shape in self.get_shapes(width):
                 for ID in solid_blocks + transparent_blocks:
                     b = anvil.Block("minecraft", ID)
-                    self.set_air_cube(new_region, b, shape)
+                    cube_func(new_region, b, shape)
 
                     self.pos.next_pos()
                 self.pos.next_z()
             self.pos.decrease_width()
             self.pos.next_y(True)
 
-    def water_block_tests(self, new_region: anvil.EmptyRegion):
-        self.water = anvil.Block("minecraft", "water")
-        self.glass = anvil.Block("minecraft", "glass")
-        self.stone = anvil.Block("minecraft", "stone")
-
-        for inner_width in range(self.pos.max_width - 4, self.pos.min_width - 1 - 4, -1):
-            for shape in self.get_shapes(inner_width):
-                for ID in solid_blocks + transparent_blocks:
-                    b = anvil.Block("minecraft", ID)
-                    self.set_water_cube(new_region, b, shape)
-
-                    self.pos.next_pos()
-                self.pos.next_z()
-            self.pos.decrease_width()
-            self.pos.next_y(True)
-
-    def repl_block_tests(self, new_region):
-        for num_blocks in range(self.pos.max_width, self.pos.min_width - 1, -1):
-            for ID in solid_blocks + transparent_blocks:
-                b = anvil.Block("minecraft", ID)
-                self.set_solid_cube(new_region, b)
-
-                self.pos.next_pos()
-            self.pos.decrease_width()
-            self.pos.next_y(True)
+    def set_shape(self, region: anvil.EmptyRegion, block: anvil.Block, shape, _range):
+        x, y, z = self.pos.xyz.x, self.pos.xyz.y, self.pos.xyz.z
+        for i in _range:
+            for j in _range:
+                for k in _range:
+                        if shape[i][j][k] == 1:
+                            region.set_block(block, x + i, y + j, z + k)
 
     def set_air_cube(self, region: anvil.EmptyRegion, block: anvil.Block, shape):
         assert len(shape) == len(shape[0]) and len(shape[0]) == len(shape[0][0])
@@ -205,23 +199,19 @@ class TestMapCreator:
         right = self.pos.half_width
         left = -right
         # inside dimensions
-        i_left = -(right - 1)
+        i_right = right - 1
+        i_left = -i_right
 
         if self.pos.now_width % 2 == 0:
-            right = right - 1
+            right -= 1
+            i_right -= 1
 
         for i in range(left, right + 1):
             for j in range(left, right + 1):
                 for k in range(left, right + 1):
                     region.set_block(block, x + i, y + j, z + k)
 
-        # TODO improvements? => remove size, dont use multiple ranges, calc x + i + i_left once
-        size = len(shape)
-        for i in range(size):
-            for j in range(size):
-                for k in range(size):
-                    if shape[i][j][k] == 1:
-                        region.set_block(self.air, x + i + i_left, y + j + i_left, z + k + i_left)
+        self.set_shape(region, self.air, shape, range(i_left, i_right + 1))
 
     def set_water_cube(self, region: anvil.EmptyRegion, block: anvil.Block, shape):
         assert len(shape) == len(shape[0]) and len(shape[0]) == len(shape[0][0])
@@ -235,8 +225,8 @@ class TestMapCreator:
         i_left = -i_right
 
         if self.pos.now_width % 2 == 0:
-            right = right - 1
-            i_right = i_right - 1
+            right -= 1
+            i_right -= 1
 
         for i in range(left, right + 1):
             for k in range(left, right + 1):
@@ -257,25 +247,16 @@ class TestMapCreator:
                 for k in range(i_left - 1, i_right + 2):
                     region.set_block(self.water, x + i, y + j, z + k)
 
-        # TODO improvements? => remove size, dont use multiple ranges, calc x + i + i_left once
-        size = len(shape)
-        for i in range(size):
-            for j in range(size):
-                for k in range(size):
-                    if shape[i][j][k] == 1:
-                        region.set_block(block, x + i + i_left, y + j + i_left, z + k + i_left)
+        self.set_shape(region, block, shape, range(i_left, i_right + 1))
 
-    def set_solid_cube(self, region: anvil.EmptyRegion, block: anvil.Block):
-        x, y, z = self.pos.xyz.x, self.pos.xyz.y, self.pos.xyz.z
+    def set_solid_cube(self, region: anvil.EmptyRegion, block: anvil.Block, shape):
+        assert len(shape) == len(shape[0]) and len(shape[0]) == len(shape[0][0])
 
         right = self.pos.half_width
         left = -right
         if self.pos.now_width % 2 == 0:
-            right = right - 1
-        for i in range(left, right + 1):
-            for j in range(left, right + 1):
-                for k in range(left, right + 1):
-                    region.set_block(block, x + i, y + j, z + k)
+            right -= 1
+        self.set_shape(region, block, shape, range(left, right + 1))
 
 
 ###################################################################################################
