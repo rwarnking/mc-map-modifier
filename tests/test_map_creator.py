@@ -5,6 +5,7 @@ import anvil  # minecraft import
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 import config as cfg  # own import
+import math_helper as m_hp
 from block_tests import solid_blocks, transparent_blocks
 from shape_generator import ShapeGenerator
 
@@ -38,7 +39,7 @@ class BlockPosition:
         self.update_width()
 
         if xyz is None:
-            self.xyz = Vector.from_one_val(self.half_width + 1)
+            self.xyz = Vector.from_one_val(self.half_width + self.dist)
         else:
             self.xyz = xyz
 
@@ -47,7 +48,7 @@ class BlockPosition:
         self.max_width = max_w
         self.now_width = max_w
         self.update_width()
-        self.xyz = Vector(self.half_width + 1, self.xyz.y, self.half_width + 1)
+        self.xyz = Vector(self.half_width + self.dist, self.xyz.y, self.half_width + self.dist)
         self.next_y()
 
     def increase_width(self, amount: int = 1):
@@ -59,10 +60,11 @@ class BlockPosition:
 
     def update_width(self):
         self.half_width = int(self.now_width / 2)
+        dist = self.now_width + self.half_width + self.dist + self.dist + 1
         self.limit = Vector(
-            cfg.REGION_B_X - self.now_width - self.half_width - self.dist - 1,
-            cfg.REGION_B_Y - self.now_width - self.half_width - self.dist - 1,
-            cfg.REGION_B_Z - self.now_width - self.half_width - self.dist - 1,
+            cfg.REGION_B_X - dist,
+            cfg.REGION_B_Y - dist,
+            cfg.REGION_B_Z - dist,
         )
 
     def next_pos(self):
@@ -131,12 +133,12 @@ class TestMapCreator:
             max_elems /= len(solid_blocks) + len(transparent_blocks)
             count = dim_size * dim_size * dim_size
             shapes = self.shape_generator.get_n_shapes(dim_size, count, 1)
-            for i in range(2, count):
-                # Get smthg similar to gaus distribution by calculating the percentage and
-                # converting it to a [-0.5, 0.5] range and then to a [0, 0.5, 0] range
-                percent = -abs((i / count) - 0.5) + 0.5
-                elems = int(max(percent * percent * max_elems, 1.0))
-                # elems calculation does not sum up to max_elems
+
+            for i in range(1, count):
+                # Get the amount of elems that should be used for this shapetype
+                # Uses normal distribution and does not produce more than max_elems
+                # TODO is not jet optimal since the total elem count is not equal to max_elems
+                elems = int(m_hp.gauss_curve_integral_1(i, count) * max_elems)
                 shapes += self.shape_generator.get_n_shapes(dim_size, i, elems)
             return shapes
 

@@ -1,6 +1,7 @@
 import random
-import numpy as np
+
 import math_helper as m_hp
+import numpy as np
 
 
 def compare_unsigned(x: int, y: int):
@@ -11,12 +12,8 @@ def compare_unsigned(x: int, y: int):
     else:
         return 0
 
-###################################################################################################
-# Bit operations
-###################################################################################################
-
 def lowest_one_bit(x: int):
-    b = (x& - x).bit_length()
+    b = (x & -x).bit_length()
     return 1 << (b - 1)
 
 def number_trailing_zeros(x: int):
@@ -27,10 +24,11 @@ def number_trailing_zeros(x: int):
 
     return count
 
+
 class IntBuilder:
     def __init__(self):
         # A lookup table to see how many combinations preceeded this one
-        self.size = 64 # 4*4*4
+        self.size = 64  # 4*4*4
         self.lookup_table_combination_pos = np.zeros((self.size, self.size))
         # The number of possible combinations with i bits
         self.nbr_combinations = np.zeros(self.size + 1)
@@ -72,7 +70,7 @@ class IntBuilder:
         position = 0
 
         while start != 0:
-            currentBit = lowest_one_bit(start) # start & -start
+            currentBit = lowest_one_bit(start)  # start & -start
             bitPos = number_trailing_zeros(currentBit)
             position += self.lookup_table_combination_pos[nbrBits][bitPos]
             # toggle off bit
@@ -93,7 +91,7 @@ class IntBuilder:
             while compare_unsigned(position, bitPositions[m]) < 0:
                 m -= 1
             position -= bitPositions[m]
-            v ^= (0b1 << m)
+            v ^= 0b1 << m
             m -= 1
 
         return v
