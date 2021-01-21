@@ -21,9 +21,9 @@ class MetaInformation:
         self.apocket_size = StringVar()
         self.apocket_size.set("1")
         self.wpocket_size = StringVar()
-        self.wpocket_size.set("2")
+        self.wpocket_size.set("1")
         self.repl_area = StringVar()
-        self.repl_area.set("2")
+        self.repl_area.set("1")
 
         self.text_queue = queue.Queue()
 
@@ -173,6 +173,10 @@ class Timer:
             counts.chunk_c_max * counts.file_count + counts.chunks_c.value
         )
 
+    # TODO this does not work
+    # propably because there are 3 steps and counts.label_i_max.value only accounts for one of
+    # them. furthermore is not respected that different files could have had different counts
+    # Solution: add a global counter of elements processed?!
     def update_i_elapsed(self, counts):
         self.elapsed_i_time.value += (self.end2_ms.value - self.start2_ms.value) / 1000
         self.t_per_i_label.value = self.elapsed_i_time.value / (

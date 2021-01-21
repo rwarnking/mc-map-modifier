@@ -119,22 +119,15 @@ class BlockPosition:
 class TestMapCreator:
     def __init__(self):
         self.shape_generator = ShapeGenerator()
-        # Array with the cube width values for all test stages
-        self.min_max_cube_width = [[3, 6], [5, 7], [3, 6]]
-        # Calculate total expected height
-        self.total_height = 0
-        for mm in self.min_max_cube_width:
-            # Add the distance between the tests
-            self.total_height += mm[1]
-            for h in range(mm[0], mm[1] + 1):
-                self.total_height += h + 1
 
         self.air = anvil.Block("minecraft", "air")
         self.water = anvil.Block("minecraft", "water")
         self.glass = anvil.Block("minecraft", "glass")
         self.stone = anvil.Block("minecraft", "stone")
 
-    def create_test_map(self, filename: str = "r.0.0.mca"):
+    def create_test_map(self, filename: str, cube_widths: List[List[int]]):
+        self.set_cube_width(cube_widths)
+
         print(f"running ... {filename}")
         target_dir = os.path.dirname(os.path.abspath(__file__)) + "/region_files_original"
         end = filename.split(".")
@@ -147,6 +140,11 @@ class TestMapCreator:
 
         # Create a new region with the `EmptyRegion` class at region coords
         new_region = anvil.EmptyRegion(r_x, r_z)
+        # Fill region with empty chunks
+        for cx in range(0, 32):
+            for cz in range(0, 32):
+                chunk = anvil.EmptyChunk(cx, cz)
+                new_region.add_chunk(chunk)
 
         print("... generating airblock tests ...")
         set_func = self.set_air_cube
@@ -161,35 +159,19 @@ class TestMapCreator:
         self.set_test_blocks(new_region, set_func)
 
         print("... saving ...")
-        # new_region.save(target_dir + "/" + filename)
+        new_region.save(target_dir + "/" + filename)
         print("... finished")
 
-    def get_shapes(self, dim_size: int, num_blocks: int = -1):
-        if num_blocks == -1:
-            # TODO
-            layer = int(cfg.REGION_B_Y / self.total_height)
-            max_elems = cfg.REGION_B_X * cfg.REGION_B_Z
-            max_elems /= (self.pos.now_width + 1) * (self.pos.now_width + 1)
-            max_elems /= len(solid_blocks) + len(transparent_blocks)
-            max_elems *= layer
-
-            count = dim_size * dim_size * dim_size
-            shapes = self.shape_generator.get_n_shapes(dim_size, count, 1)
-
-            if dim_size < 5:
-                for i in range(1, count):
-                    # Get the amount of elems that should be used for this shapetype
-                    # Uses normal distribution and does not produce more than max_elems
-                    # TODO is not jet optimal since the total elem count is not equal to max_elems
-                    elems = int(m_hp.gauss_curve_integral_1(i, count) * max_elems)
-                    shapes += self.shape_generator.get_n_shapes(dim_size, i, elems)
-            return shapes
-
-        if num_blocks > 2:
-            elems = (cfg.REGION_B_X * cfg.REGION_B_Z) / (self.pos.now_width + 1)
-            return self.shape_generator.get_n_shapes(dim_size, num_blocks, elems)
-
-        return self.shape_generator.get_shapes(dim_size, num_blocks)
+    def set_cube_width(self, cube_widths: List[List[int]]):
+        # Array with the cube width values for all test stages
+        self.min_max_cube_width = cube_widths
+        # Calculate total expected height
+        self.total_height = 0
+        for mm in self.min_max_cube_width:
+            # Add the distance between the tests
+            self.total_height += mm[1]
+            for h in range(mm[0], mm[1] + 1):
+                self.total_height += h + 1
 
     def set_test_blocks(
         self,
@@ -219,13 +201,32 @@ class TestMapCreator:
             self.pos.decrease_width()
             self.pos.next_y(True)
 
-    def set_shape(self, region: anvil.EmptyRegion, block: anvil.Block, shape, _range):
-        x, y, z = self.pos.xyz.x, self.pos.xyz.y, self.pos.xyz.z
-        for i in _range:
-            for j in _range:
-                for k in _range:
-                        if shape[i][j][k] == 1:
-                            region.set_block(block, x + i, y + j, z + k)
+    def get_shapes(self, dim_size: int, num_blocks: int = -1):
+        if num_blocks == -1:
+            # TODO
+            layer = min(int(cfg.REGION_B_Y / self.total_height), 3)
+            max_elems = cfg.REGION_B_X * cfg.REGION_B_Z
+            max_elems /= (self.pos.now_width + 1) * (self.pos.now_width + 1)
+            max_elems /= len(solid_blocks) + len(transparent_blocks)
+            max_elems *= layer
+
+            count = dim_size * dim_size * dim_size
+            shapes = self.shape_generator.get_n_shapes(dim_size, count, 1)
+
+            if dim_size < 5:
+                for i in range(1, count):
+                    # Get the amount of elems that should be used for this shapetype
+                    # Uses normal distribution and does not produce more than max_elems
+                    # TODO is not jet optimal since the total elem count is not equal to max_elems
+                    elems = int(m_hp.gauss_curve_integral_1(i, count) * max_elems)
+                    shapes += self.shape_generator.get_n_shapes(dim_size, i, elems)
+            return shapes
+
+        if num_blocks > 2:
+            elems = (cfg.REGION_B_X * cfg.REGION_B_Z) / (self.pos.now_width + 1)
+            return self.shape_generator.get_n_shapes(dim_size, num_blocks, elems)
+
+        return self.shape_generator.get_shapes(dim_size, num_blocks)
 
     def set_air_cube(self, region: anvil.EmptyRegion, block: anvil.Block, shape):
         assert len(shape) == len(shape[0]) and len(shape[0]) == len(shape[0][0])
@@ -294,11 +295,20 @@ class TestMapCreator:
             right -= 1
         self.set_shape(region, block, shape, range(left, right + 1))
 
+    def set_shape(self, region: anvil.EmptyRegion, block: anvil.Block, shape, _range):
+        x, y, z = self.pos.xyz.x, self.pos.xyz.y, self.pos.xyz.z
+        for i in _range:
+            for j in _range:
+                for k in _range:
+                        if shape[i][j][k] == 1:
+                            region.set_block(block, x + i, y + j, z + k)
+
 
 ###################################################################################################
 # Main
 ###################################################################################################
 if __name__ == "__main__":
     c = TestMapCreator()
-    c.create_test_map()
-    # c.create_test_map("r.-1.0.mca")
+    c.create_test_map("r.0.0.mca", [[3, 3], [5, 5], [3, 3]])
+    # c.create_test_map("r.0.0.mca", [[3, 6], [5, 7], [3, 6]])
+    # c.create_test_map("r.-1.0.mca", [[3, 6], [5, 7], [3, 6]])

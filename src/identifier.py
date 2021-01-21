@@ -34,14 +34,6 @@ class Identifier:
 
     ###############################################################################################
 
-    # TODO np.savetxt("data2.csv", arr[1], fmt="%i", delimiter=",")
-    # times
-    # classify: 64048 - 86219
-    # identify: 62331 - 74528
-    # modify: 476081
-    # save: 208582
-    # total: 814072 upto 900000
-    # 14 min 4
     def identify(self, c_regions, counts, timer):
         identified_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
 
@@ -64,12 +56,14 @@ class Identifier:
         # TODO make labeled and num self?
         labeled, num = label2(c_region, np.ones((3, 3, 3)))
         counts.label_i.value = 0
-        counts.label_i_max.value = num  # last label count = 487
+        counts.label_i_max.value = num
 
         self.filler = cfg.AIRPOCKET
 
         # Check for label-amount and use multiprocessing if needed
-        if num < cfg.PROCESSES * 5:
+        if num <= 0:
+            return
+        elif num < cfg.PROCESSES * 5:
             valid = self.validator_air
             self.fill_labels_sp(
                 labeled, num, c_region, counts, counts.changed_air, valid, self.identified, timer
@@ -84,11 +78,13 @@ class Identifier:
             c_region, connectivity=3, return_num=True, background=cfg.G_BACKGROUND
         )
         counts.label_i.value = 0
-        counts.label_i_max.value = num  # last label count = 9
+        counts.label_i_max.value = num
 
         self.filler = cfg.WATERBLOCK
 
-        if num < cfg.PROCESSES * 5:
+        if num <= 0:
+            return
+        elif num < cfg.PROCESSES * 5:
             valid = self.validator_water
             self.fill_labels_sp(
                 labeled, num, c_region, counts, counts.changed_water, valid, self.identified, timer
@@ -113,11 +109,13 @@ class Identifier:
             c_region, connectivity=2, return_num=True, background=cfg.G_BACKGROUND
         )
         counts.label_i.value = 0
-        counts.label_i_max.value = num  # last label count = 16 for repl_area = 5
+        counts.label_i_max.value = num
 
         self.filler = cfg.SOLIDAREA
 
-        if num < cfg.PROCESSES * 5:
+        if num <= 0:
+            return
+        elif num < cfg.PROCESSES * 5:
             valid = self.validator_repl
             self.fill_labels_sp(
                 labeled, num, c_region, counts, counts.changed_repl, valid, self.identified, timer

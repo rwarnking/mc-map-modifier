@@ -24,7 +24,7 @@ class TestAll(unittest.TestCase):
         meta_info.set_dirs(S_DIR + "_original", S_DIR + "_replacement", S_DIR + "_copy")
         meta_info.finished = False
 
-        settings_list = [[1, 0, 0, 1, 1, 1]]
+        settings_list = [[1, 1, 1, 1, 1, 1]]
 
         c = Copier(meta_info)
 
@@ -45,10 +45,6 @@ class TestAll(unittest.TestCase):
 
             self.assertTrue(os.path.exists(meta_info.target_dir.get()))
             self.assertTrue(self.are_files_equal(S_DIR))
-
-        # TODO this is used to trigger an error in the testing
-        # a better way would be to print directly to the github log instead of the stdout
-        # self.assertEqual(2, 3)
 
         # IMPORTANT
         # TODO this does not work with the tests since this function does not exist in the lib
