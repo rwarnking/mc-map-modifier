@@ -132,7 +132,7 @@ class IntBuilder:
 
         if k == 0:
             return []
-        elif k < 0:
+        elif k < 0 or k > comb_count:
             k = comb_count
 
         # Collect the combinations that should be saved

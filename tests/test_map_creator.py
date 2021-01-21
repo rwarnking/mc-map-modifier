@@ -30,9 +30,24 @@ class Vector:
         self.y += vec.y
         self.z += vec.z
 
+    def add_arr(self, arr: List[int]):
+        self.x += arr[0]
+        self.y += arr[1]
+        self.z += arr[2]
+
+    def add_ints(self, x: int, y: int, z: int):
+        self.x += x
+        self.y += y
+        self.z += z
+
+    def print(self):
+        print(self.x, self.y, self.z)
 
 class BlockPosition:
-    def __init__(self, min_w: int, max_w: int, xyz: Vector = None):
+    def __init__(self, min_w: int, max_w: int, r_x: int = 0, r_z: int = 0, xyz: Vector = None):
+        self.r_x = r_x * cfg.REGION_B_X
+        self.r_z = r_z * cfg.REGION_B_Z
+
         self.dist = 1
         self.min_width = min_w
         self.max_width = max_w
@@ -43,13 +58,18 @@ class BlockPosition:
             self.xyz = Vector.from_one_val(self.half_width + self.dist)
         else:
             self.xyz = xyz
+        self.xyz.add_ints(self.r_x, 0, self.r_z)
 
     def reset_no_y(self, min_w: int, max_w: int):
         self.min_width = min_w
         self.max_width = max_w
         self.now_width = max_w
         self.update_width()
-        self.xyz = Vector(self.half_width + self.dist, self.xyz.y, self.half_width + self.dist)
+        self.xyz = Vector(
+            self.half_width + self.dist + self.r_x,
+            self.xyz.y,
+            self.half_width + self.dist + self.r_z
+        )
         self.next_y()
 
     def increase_width(self, amount: int = 1):
@@ -61,8 +81,12 @@ class BlockPosition:
 
     def update_width(self):
         self.half_width = int(self.now_width / 2)
-        dist = self.now_width + self.half_width + self.dist + self.dist + 1
-        self.limit = Vector(cfg.REGION_B_X - dist, cfg.REGION_B_Y - dist, cfg.REGION_B_Z - dist)
+        dist = self.now_width + self.half_width + self.dist + self.dist + 1 + 1
+        self.limit = Vector(
+            cfg.REGION_B_X - dist + self.r_x,
+            cfg.REGION_B_Y - dist,
+            cfg.REGION_B_Z - dist + self.r_z
+        )
 
     def next_pos(self):
         if self.xyz.x < self.limit.x:
@@ -78,9 +102,9 @@ class BlockPosition:
         self.xyz.x += self.now_width + self.dist
 
     def next_y(self, add: bool = False):
-        self.xyz.x = self.half_width + self.dist
+        self.xyz.x = self.half_width + self.dist + self.r_x
         self.xyz.y += self.now_width + self.dist
-        self.xyz.z = self.half_width + self.dist
+        self.xyz.z = self.half_width + self.dist + self.r_z
 
         if add and self.now_width % 2 == 0:
             self.xyz.y += 1
@@ -88,28 +112,38 @@ class BlockPosition:
             raise Exception("Y border value reached!")
 
     def next_z(self):
-        self.xyz.x = self.half_width + self.dist
+        self.xyz.x = self.half_width + self.dist + self.r_x
         self.xyz.z += self.now_width + self.dist
 
 
 class TestMapCreator:
     def __init__(self):
         self.shape_generator = ShapeGenerator()
-        min_cube_width = 3
-        max_cube_width = 6
-        self.pos = BlockPosition(min_cube_width, max_cube_width)
+        # Array with the cube width values for all test stages
+        self.min_max_cube_width = [[3, 6], [5, 7], [3, 6]]
+        # Calculate total expected height
+        self.total_height = 0
+        for mm in self.min_max_cube_width:
+            # Add the distance between the tests
+            self.total_height += mm[1]
+            for h in range(mm[0], mm[1] + 1):
+                self.total_height += h + 1
 
         self.air = anvil.Block("minecraft", "air")
         self.water = anvil.Block("minecraft", "water")
         self.glass = anvil.Block("minecraft", "glass")
         self.stone = anvil.Block("minecraft", "stone")
 
-    def create_test_map(self, filename: str = "r1.0.0.mca"):
-        print("running ...")
+    def create_test_map(self, filename: str = "r.0.0.mca"):
+        print(f"running ... {filename}")
         target_dir = os.path.dirname(os.path.abspath(__file__)) + "/region_files_original"
         end = filename.split(".")
         r_x = int(end[1])
         r_z = int(end[2])
+
+        self.pos = BlockPosition(
+            self.min_max_cube_width[0][0], self.min_max_cube_width[0][1], r_x, r_z
+        )
 
         # Create a new region with the `EmptyRegion` class at region coords
         new_region = anvil.EmptyRegion(r_x, r_z)
@@ -118,24 +152,26 @@ class TestMapCreator:
         set_func = self.set_air_cube
         self.set_test_blocks(new_region, set_func, 2)
         print("... generating waterblock tests ...")
-        self.pos.reset_no_y(5, 7)
+        self.pos.reset_no_y(self.min_max_cube_width[1][0], self.min_max_cube_width[1][1])
         set_func = self.set_water_cube
         self.set_test_blocks(new_region, set_func, 4)
         print("... generating replblock tests ...")
-        self.pos.reset_no_y(3, 6)
+        self.pos.reset_no_y(self.min_max_cube_width[2][0], self.min_max_cube_width[2][1])
         set_func = self.set_solid_cube
         self.set_test_blocks(new_region, set_func)
 
         print("... saving ...")
-        new_region.save(target_dir + "/" + filename)
+        # new_region.save(target_dir + "/" + filename)
         print("... finished")
 
     def get_shapes(self, dim_size: int, num_blocks: int = -1):
         if num_blocks == -1:
             # TODO
+            layer = int(cfg.REGION_B_Y / self.total_height)
             max_elems = cfg.REGION_B_X * cfg.REGION_B_Z
             max_elems /= (self.pos.now_width + 1) * (self.pos.now_width + 1)
             max_elems /= len(solid_blocks) + len(transparent_blocks)
+            max_elems *= layer
 
             count = dim_size * dim_size * dim_size
             shapes = self.shape_generator.get_n_shapes(dim_size, count, 1)
@@ -265,3 +301,4 @@ class TestMapCreator:
 if __name__ == "__main__":
     c = TestMapCreator()
     c.create_test_map()
+    # c.create_test_map("r.-1.0.mca")
