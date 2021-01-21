@@ -40,4 +40,5 @@ jobs:
           exec Xvfb $disp -screen $screen $geom 2>/tmp/Xvfb.log &
           export DISPLAY=:12
           # Run TestSuites
-          python -m pytest tests/test_all.py
+          python -m pytest tests/test_small.py
+          python -m pytest tests/test_big.py

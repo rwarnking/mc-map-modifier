@@ -1,9 +1,8 @@
+import pathmagic  # noqa isort:skip
 import os
-import pymagic  # noqa
-
-import anvil  # minecraft import
 from typing import Callable, List
 
+import anvil  # minecraft import
 import config as cfg  # own import
 import math_helper as m_hp
 from block_tests import solid_blocks, transparent_blocks
@@ -309,6 +308,6 @@ class TestMapCreator:
 ###################################################################################################
 if __name__ == "__main__":
     c = TestMapCreator()
-    c.create_test_map("r.0.0.mca", [[3, 3], [5, 5], [3, 3]])
-    # c.create_test_map("r.0.0.mca", [[3, 6], [5, 7], [3, 6]])
+    # c.create_test_map("r.0.0.mca", [[3, 3], [5, 5], [3, 3]])
+    c.create_test_map("r.0.0.mca", [[3, 6], [5, 7], [3, 6]])
     # c.create_test_map("r.-1.0.mca", [[3, 6], [5, 7], [3, 6]])
