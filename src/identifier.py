@@ -60,15 +60,22 @@ class Identifier:
 
         self.filler = cfg.AIRPOCKET
 
+        print(num)
+
         # Check for label-amount and use multiprocessing if needed
         if num <= 0:
+            print("hi1")
             return
         elif num < cfg.PROCESSES * 5:
+            print("hi2")
+
             valid = self.validator_air
             self.fill_labels_sp(
                 labeled, num, c_region, counts, counts.changed_air, valid, self.identified, timer
             )
         else:
+            print("hi3")
+
             self.fill_labels_mp(
                 labeled, num, c_region, identified_shared, counts, counts.changed_air, 1, timer
             )

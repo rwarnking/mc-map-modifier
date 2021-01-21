@@ -3,9 +3,8 @@
 # https://github.com/navdeep-G/samplemod
 # https://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 import os
-import sys
+import pymagic  # noqa
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 import unittest
 from tkinter import Tk  # Needed for metainfo
 
@@ -24,9 +23,9 @@ class TestAll(unittest.TestCase):
         meta_info.set_dirs(S_DIR + "_original", S_DIR + "_replacement", S_DIR + "_copy")
         meta_info.finished = False
 
-        settings_list = [[1, 1, 1, 1, 1, 1]]
+        print(S_DIR + "_original")
 
-        c = Copier(meta_info)
+        settings_list = [[1, 1, 1, 1, 1, 1]]
 
         for setting in settings_list:
             # Set the meta_info data
@@ -37,6 +36,7 @@ class TestAll(unittest.TestCase):
             meta_info.wpocket_size.set(setting[4])
             meta_info.repl_area.set(setting[5])
 
+            c = Copier(meta_info)
             # Run the copy process
             c.run()
 
@@ -58,6 +58,8 @@ class TestAll(unittest.TestCase):
         region = anvil.Region.from_file(S_DIR + "_copy" + "/" + filename)
         cmp_region = anvil.Region.from_file(S_DIR + "_test" + "/" + filename)
 
+        print(S_DIR + "_copy" + "/" + filename)
+
         for chunk_x in range(cfg.REGION_C_X):
             for chunk_z in range(cfg.REGION_C_Z):
                 chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
@@ -71,6 +73,8 @@ class TestAll(unittest.TestCase):
                     cmp_block = cmp_chunk.get_block(x, y, z)
 
                     if cmp_block.id != block.id:
+                        print(x, y, z)
+                        print(cmp_block.id, block.id)
                         return False
 
                     # TODO

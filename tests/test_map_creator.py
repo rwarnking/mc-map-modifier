@@ -1,12 +1,11 @@
 import os
-import sys
+import pymagic  # noqa
 
 import anvil  # minecraft import
+from typing import Callable, List
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 import config as cfg  # own import
 import math_helper as m_hp
-from typing import Callable, List
 from block_tests import solid_blocks, transparent_blocks
 from shape_generator import ShapeGenerator
 
@@ -43,6 +42,7 @@ class Vector:
     def print(self):
         print(self.x, self.y, self.z)
 
+
 class BlockPosition:
     def __init__(self, min_w: int, max_w: int, r_x: int = 0, r_z: int = 0, xyz: Vector = None):
         self.r_x = r_x * cfg.REGION_B_X
@@ -68,7 +68,7 @@ class BlockPosition:
         self.xyz = Vector(
             self.half_width + self.dist + self.r_x,
             self.xyz.y,
-            self.half_width + self.dist + self.r_z
+            self.half_width + self.dist + self.r_z,
         )
         self.next_y()
 
@@ -85,7 +85,7 @@ class BlockPosition:
         self.limit = Vector(
             cfg.REGION_B_X - dist + self.r_x,
             cfg.REGION_B_Y - dist,
-            cfg.REGION_B_Z - dist + self.r_z
+            cfg.REGION_B_Z - dist + self.r_z,
         )
 
     def next_pos(self):
@@ -177,7 +177,7 @@ class TestMapCreator:
         self,
         new_region: anvil.EmptyRegion,
         cube_func: Callable[[anvil.EmptyRegion, anvil.Block, List[List[List[int]]]], None],
-        adj_w: int = 0
+        adj_w: int = 0,
     ):
         """Adds test cubes for all thicknesses to the passed region.
 
@@ -300,8 +300,8 @@ class TestMapCreator:
         for i in _range:
             for j in _range:
                 for k in _range:
-                        if shape[i][j][k] == 1:
-                            region.set_block(block, x + i, y + j, z + k)
+                    if shape[i][j][k] == 1:
+                        region.set_block(block, x + i, y + j, z + k)
 
 
 ###################################################################################################
