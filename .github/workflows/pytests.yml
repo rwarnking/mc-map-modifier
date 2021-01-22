@@ -31,7 +31,7 @@ jobs:
           pip install scipy
           pip install scikit-image
           pip install matplotlib
-      - name: Run tests with pytest
+      - name: Run small test with pytest
         run: |
           # Start virtual display driver
           disp=:12
@@ -41,4 +41,7 @@ jobs:
           export DISPLAY=:12
           # Run TestSuites
           python -m pytest tests/test_small.py
+      - name: Run big test with pytest
+        run: |
+          # Run TestSuites
           python -m pytest tests/test_big.py

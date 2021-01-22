@@ -175,7 +175,7 @@ class Copier:
         # Save to a file
         self.meta_info.counts.algo_step = cfg.A_SAVE
         target_dir = self.meta_info.target_dir.get()
-        new_region.save(target_dir + "/" + filename)
+        new_region.save(target_dir + "/" + filename, region)
         self.meta_info.counts.algo_step = cfg.A_FINISHED
 
         ms = int(round(time.time() * 1000))

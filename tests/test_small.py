@@ -9,8 +9,9 @@ class TestSmall(unittest.TestCase):
         settings_list = [1, 1, 1, 1, 1, 1]
         S_DIR = os.path.dirname(os.path.abspath(__file__)) + "/region_files"
 
+        test_num = "t1"
         t_u = TestUtils()
-        t_u.copy(S_DIR, settings_list)
+        t_u.copy(S_DIR, test_num, settings_list)
 
-        self.assertTrue(os.path.exists(S_DIR + "_copy"))
-        self.assertTrue(t_u.are_files_equal(S_DIR))
+        self.assertTrue(os.path.exists(S_DIR + "_copy/" + test_num))
+        self.assertTrue(t_u.are_files_equal(S_DIR, test_num))

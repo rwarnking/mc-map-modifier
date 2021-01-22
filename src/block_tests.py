@@ -476,7 +476,7 @@ def get_water_type(block_id):
 
 
 def is_hot(block_id):
-    if is_transparent(block_id) or is_water(block_id):
+    if is_air(block_id) or is_transparent(block_id) or is_water(block_id):
         return True
     else:
         return False

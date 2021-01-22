@@ -1,6 +1,7 @@
 import anvil  # minecraft import
 import config as cfg  # own import
 from anvil.errors import OutOfBoundsCoordinates
+from anvil_modifications import save_chunk, save_region
 from block_tests import is_hot, is_repl_block, is_solid  # own imports
 from nbt import nbt  # minecraft import
 
@@ -18,8 +19,12 @@ class Modifier:
         self.rail = anvil.Block("minecraft", "rail")
         self.powered_rail = anvil.Block("minecraft", "powered_rail")
 
+        # https://tryolabs.com/blog/2013/07/05/run-time-method-patching-python/
+        # TODO put this somewhere else?
+        anvil.EmptyChunk.save = save_chunk
+        anvil.EmptyRegion.save = save_region
+
     def modify(self, chunk, repl_chunk, new_region, chunk_x, chunk_z):
-        new_chunk = 0
         x = 0
         y = 0
         z = 0
@@ -70,7 +75,7 @@ class Modifier:
                 print(f"GlobalPos: ({x_global}, {y}, {z_global})")
 
             try:
-                new_chunk = new_region.set_block(b, x_global, y, z_global)
+                new_region.set_block(b, x_global, y, z_global)
             except OutOfBoundsCoordinates:
                 print(f"could not set Block ({x},{y},{z})")
 
@@ -80,9 +85,6 @@ class Modifier:
             if x == 15:
                 z = (z + 1) % 16
             x = (x + 1) % 16
-
-        # TODO this does not work with the tests since this function does not exist in the lib
-        # new_chunk.set_data(chunk.data)
 
     def get_replacement_block(self, repl_chunk, x, y, z):
         gold_block = anvil.Block("minecraft", "gold_block")
@@ -182,7 +184,7 @@ class Modifier:
 
         # TODO gui
         if True:
-            self.place_chests(new_region, start[0], start[1], start[2], direction)
+            self.place_chests(region, new_region, start[0], start[1], start[2], direction)
 
     # TODO these 2 functions should be combinable
     def set_5x5_x(self, region, new_region, x, y, z, place_torch):
@@ -327,7 +329,7 @@ class Modifier:
                         else:
                             self.item_dict[block.id] = 1
 
-    def place_chests(self, new_region, x, y, z, direction):
+    def place_chests(self, region, new_region, x, y, z, direction):
         # add_x = 1
         # add_z = 0
         chest = anvil.Block("minecraft", "chest")
@@ -365,7 +367,7 @@ class Modifier:
 
                 chunk_idx_x = chest_x // cfg.CHUNK_B_X
                 chunk_idx_z = chest_z // cfg.CHUNK_B_Z
-                chunk = new_region.get_chunk(chunk_idx_x, chunk_idx_z)
+                chunk = region.get_chunk(chunk_idx_x, chunk_idx_z)
 
                 if chunk.data["TileEntities"].tagID != nbt.TAG_Compound.id:
                     chunk.data["TileEntities"] = nbt.TAG_List(
