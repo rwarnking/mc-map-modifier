@@ -5,7 +5,7 @@ from typing import Callable, List
 import anvil  # minecraft import
 import config as cfg  # own import
 import math_helper as m_hp
-from block_tests import solid_blocks, transparent_blocks
+from block_lists import solid_blocks, transparent_blocks
 from shape_generator import ShapeGenerator
 
 

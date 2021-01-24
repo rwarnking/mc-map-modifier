@@ -2,7 +2,7 @@ import anvil  # minecraft import
 import config as cfg  # own import
 from anvil.errors import OutOfBoundsCoordinates
 from anvil_modifications import save_chunk, save_region
-from block_tests import is_hot, is_repl_block, is_solid  # own imports
+from block_tests import is_hot, is_repl_block  # own imports
 from nbt import nbt  # minecraft import
 
 
@@ -63,7 +63,7 @@ class Modifier:
                 if repl_chunk:
                     new_block = repl_chunk.get_block(x, y, z)
                     # Replace the block if it is solid but use the original when it is not
-                    if is_solid(new_block.id):
+                    if is_repl_block(new_block.id):
                         b = new_block
                     # TODO debug version
                     b = diamond_block

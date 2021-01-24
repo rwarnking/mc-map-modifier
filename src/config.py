@@ -1,3 +1,5 @@
+VERSION = 14
+
 # Blocks per chunk
 CHUNK_B_X = 16
 CHUNK_B_Y = 256

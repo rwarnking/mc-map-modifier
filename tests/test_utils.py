@@ -38,8 +38,6 @@ class TestUtils:
         while not meta_info.text_queue.empty():
             print(meta_info.text_queue.get(0))
 
-        # TODO push test map and result map
-
     def are_files_equal(self, S_DIR: str, test_num: str):
         # TODO get the files
         filename = "r.0.0.mca"
@@ -48,6 +46,7 @@ class TestUtils:
 
         for chunk_x in range(cfg.REGION_C_X):
             for chunk_z in range(cfg.REGION_C_Z):
+                # TODO speed this up, this takes for ever (10 min)
                 chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
                 cmp_chunk = anvil.Chunk.from_region(cmp_region, chunk_x, chunk_z)
 
@@ -59,7 +58,8 @@ class TestUtils:
                     cmp_block = cmp_chunk.get_block(x, y, z)
 
                     if cmp_block.id != block.id:
-                        print(x, y, z, cmp_block.id, block.id)
+                        print(chunk_x * cfg.CHUNK_B_X + x, y, chunk_z * cfg.CHUNK_B_Z + z)
+                        print(cmp_block.id, block.id)
                         return False
 
                     # TODO
