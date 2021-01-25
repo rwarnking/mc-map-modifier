@@ -28,12 +28,12 @@ region files (.mca).
 The selectable functions are:
 
 - [x] Fill air pockets
-    - tested values: 1
+  - tested values: 1
 - [x] Fill block pockets inside the water
-    - tested values: 1, 2, 3
+  - tested values: 1, 2, 3
 - [x] Replace solid areas
-    - tested values: 0, 1, 2, 3, 4
-    - recommended value: 2
+  - tested values: 0, 1, 2, 3, 4
+  - recommended value: 2
 - [ ] Fill a cave at a given position
 - [ ] Dig a railway tunnel between a start- and an endpoint
 
@@ -50,8 +50,8 @@ either by using simple stone blocks or using a replacement map.
 
   As can be seen most of the holes where removed, only those of bigger size are still present.
   </p>
-  <img src="images/ex1_airp_before.png" alt="Air pockets before" width="49%" />
-  <img src="images/ex1_airp_after.png" alt="Air pockets after" width="49%" />
+  <img src="images/ex1_airp_before.png" alt="Air pockets before" width="47%" />
+  <img src="images/ex1_airp_after.png" alt="Air pockets after" width="47%" />
 </p>
 
 ### Remove water blocks
@@ -69,8 +69,8 @@ Using this modifier allows to remove these misplaced blocks, replacing them with
 
   As can be seen some of the structures were removed.
   </p>
-  <img src="images/ex1_waterp_before.png" alt="Water blocks before" width="49%" />
-  <img src="images/ex1_waterp_before.png" alt="Water blocks after" width="49%" />
+  <img src="images/ex1_waterb_before.png" alt="Water blocks before" width="47%" />
+  <img src="images/ex1_waterb_before.png" alt="Water blocks after" width="47%" />
 </p>
 
 ### Replacing blocks
@@ -81,7 +81,7 @@ are checked and replaced if a replacement map is given. The replacement block is
 looking at the same spot in the replacement map. Therefore it is beneficiall to
 use the same seed as the original map for the replacement map.
 The seed of a map can be optained by using the ingame command:
-```
+```bash
 /seed
 ```
 The neighbourhood parameter determines the amount of blocks that are between the first
@@ -90,8 +90,8 @@ destroying handmade structures. Due to the neighbourhood parameter no blocks are
 replaced that are visible.
 
 <p float="left">
-  <img src="images/ex1_airp_before.png" alt="Replacement blocks before" width="49%" />
-  <img src="images/ex1_airp_after.png" alt="Replacement blocks after" width="49%" />
+  <img src="images/ex1_airp_before.png" alt="Replacement blocks before" width="47%" />
+  <img src="images/ex1_airp_after.png" alt="Replacement blocks after" width="47%" />
 </p>
 
 ## Installation
@@ -101,11 +101,11 @@ replaced that are visible.
 ### From Sourcecode
 
 Download this repository or install directly from github
-```
+```bash
 pip install git+https://github.com/rwarnking/mc-map-modifier.git
 ```
 and use
-```
+```bash
 pip install -r requirements.txt
 ```
 to install all dependencys.
@@ -137,10 +137,41 @@ Inputfiles upto version 1.16 should be processable.
 
 ## How does it work
 
+The algorithm for all modifications can be divided into the following steps:
+- classification
+- identification
+- modification
+- copying
+
+The first two steps are calculated for a complete region. This is done to allow for
+multiprocessing and prevent borders between chunks where the algorithm would either not
+be able to run or would need a extensive special case.
+
+The Idea is, to assign each block to one of two or three groups, such that it is known
+whether a block may be of interest and therefore adjusted later, or totaly unintering
+for the given modification.
+
+After that a labeling algorithm is used to get all connected groups of one type.
+This allows to loop through all groups and check whether they should be modified.
+One possiblity is to use the size of the group as a criterion - meaning that for example
+is the group is of size one, than it is known that there is a single block of the
+given type created by the classification step.
+
+Using this data the modification step loop through all blocks of the region an modifies
+the blocks that where identified acordingly.
+
 ### Filling algorithm
+
+#### Classification
+#### Identification
 
 ### Deletion algorithm
 
 ### Replacement algorithm
 
 ## How to contribute
+
+If you find some kind of bug or if you have ideas for improving the algorithms or
+speeding up the process feel free to write an issue.
+Sadly it is not guaranteed that this project will be maintained endlessly and therefore
+it is possible that new issues will not be fixed.
