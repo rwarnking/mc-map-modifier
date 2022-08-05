@@ -119,8 +119,7 @@ class IntBuilder:
         return shape_list
 
     def get_k_combs_n_bits(self, bits: int, n: int, k: int = -1):
-        """ Returns a list of k integers that have n bits set
-        """
+        """Returns a list of k integers that have n bits set"""
         shape_list = []
         if n > bits:
             raise Exception("More blocks then positions!")

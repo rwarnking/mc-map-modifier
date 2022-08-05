@@ -20,7 +20,7 @@ class Vector:
         return cls(val, val, val)
 
     @classmethod
-    def from_array(cls, xyz: [int]):
+    def from_array(cls, xyz: List[int]):
         return cls(xyz[0], xyz[1], xyz[2])
 
     def add_vec(self, vec: "Vector"):
