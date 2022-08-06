@@ -1,7 +1,7 @@
-pytest==6.2.1
-setuptools==51.3.3
-anvil-parser==0.8.3
-numpy==1.19.2
-scipy==1.5.2
-scikit-image==0.16.2
-matplotlib==3.1.2
+pytest>=6.2.1
+setuptools>=51.3.3
+anvil-parser>=0.8.3
+numpy>=1.19.2
+scipy>=1.5.2
+scikit-image>=0.16.2
+matplotlib>=3.1.2

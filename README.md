@@ -108,20 +108,28 @@ pip install git+https://github.com/rwarnking/mc-map-modifier.git
 
 ### Dependencies
 
-Use
+This project uses python. One of the tested versions is python 3.9.
+
+Use either
 ```bash
 pip install -r requirements.txt
 ```
 to install all dependencies.
 
+Or use Anaconda for your python environment and create a new environment with
+```bash
+conda env create --file mc-env.txt
+```
+afterwards activate the environment (`conda activate mc`) and start the application.
+
 The main dependency is the anvil tool found here:
 [anvil-parser](https://github.com/matcool/anvil-parser)
 
 Further dependencies are mostly computer vision libraries for image processing:
-[numpy](https://numpy.org)
-[scipy](https://www.scipy.org)
-[scikit-image](https://scikit-image.org)
-[matplotlib](https://matplotlib.org)
+- [numpy](https://numpy.org)
+- [scipy](https://www.scipy.org)
+- [scikit-image](https://scikit-image.org)
+- [matplotlib](https://matplotlib.org)
 
 ## Usage
 

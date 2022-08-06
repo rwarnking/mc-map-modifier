@@ -157,7 +157,7 @@ class TestMapCreator:
         set_func = self.set_solid_cube
         self.set_test_blocks(new_region, set_func)
 
-        print("... saving ...")
+        print("... saving to region_files_original ...")
         new_region.save(target_dir + "/" + filename)
         print("... finished")
 
@@ -307,7 +307,15 @@ class TestMapCreator:
 # Main
 ###################################################################################################
 if __name__ == "__main__":
+
+    size = "small"
+    mapname = "r.0.0.mca"
+    mapname = "r.-1.0.mca"
+
     c = TestMapCreator()
-    c.create_test_map("r.0.0.mca", [[3, 3], [5, 5], [3, 3]])
-    # c.create_test_map("r.0.0.mca", [[3, 6], [5, 7], [3, 6]])
-    # c.create_test_map("r.-1.0.mca", [[3, 6], [5, 7], [3, 6]])
+    if size == "small":
+        print("Creating small test map!")
+        c.create_test_map("r.0.0.mca", [[3, 3], [5, 5], [3, 3]])
+    elif size == "big":
+        print("Creating big test map!")
+        c.create_test_map("r.0.0.mca", [[3, 6], [5, 7], [3, 6]])
