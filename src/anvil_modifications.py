@@ -1,6 +1,7 @@
 import math
 import zlib
 from io import BytesIO
+from typing import Optional
 
 from anvil import Chunk, Region
 from nbt import nbt
@@ -19,7 +20,7 @@ def save_region(self, file=None, region: Region = None) -> bytes:
         will be saved there.
     """
     # Store all the chunks data as zlib compressed nbt data
-    chunks_data = []
+    chunks_data: list[Optional[bytes]] = []
     for chunk in self.chunks:
         if chunk is None:
             chunks_data.append(None)
@@ -29,17 +30,17 @@ def save_region(self, file=None, region: Region = None) -> bytes:
             nbt_data = nbt.NBTFile()
             nbt_data.tags.append(nbt.TAG_Int(name="DataVersion", value=chunk.version))
             nbt_data.tags.append(chunk.data)
-        else:
+        elif region is not None:
             data = region.get_chunk(chunk.x, chunk.z).data
             nbt_data = chunk.save(data)
         nbt_data.write_file(buffer=chunk_data)
         chunk_data.seek(0)
-        chunk_data = zlib.compress(chunk_data.read())
-        chunks_data.append(chunk_data)
+        chunk_data_bytes = zlib.compress(chunk_data.read())
+        chunks_data.append(chunk_data_bytes)
 
     # This is what is added after the location and timestamp header
     chunks_bytes = bytes()
-    offsets = []
+    offsets: list[Optional[tuple]] = []
     for chunk in chunks_data:
         if chunk is None:
             offsets.append(None)
