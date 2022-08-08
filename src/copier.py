@@ -115,7 +115,6 @@ class Copier:
         self.meta_info.finished = True
 
     ###############################################################################################
-
     def copyRegion(self, filename):
         end = filename.split(".")
         rX = int(end[1])

@@ -33,7 +33,7 @@ class ClassifierMP:
 
         with closing(
             mp.Pool(
-                processes=4,
+                processes=cfg.PROCESSES,
                 initializer=self.init_worker,
                 initargs=(shared_arrays, region, counts, timer),
             )

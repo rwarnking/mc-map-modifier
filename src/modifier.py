@@ -35,6 +35,13 @@ class Modifier:
         # gold_block = anvil.Block("minecraft", "gold_block")
         # blue_wool = anvil.Block("minecraft", "blue_wool")
 
+        b = 0
+        xyz = 0
+        x_region = 0
+        z_region = 0
+        x_global = 0
+        z_global = 0
+
         # Iterate all blocks and select write the new block to the new_chunk
         for block in chunk.stream_chunk():
             b = block
