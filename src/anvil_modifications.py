@@ -7,7 +7,24 @@ from anvil import Chunk, Region
 from nbt import nbt
 
 
-def save_region(self, file=None, region: Region = None) -> bytes:
+def set_chunk(self, chunk, region):
+    # Store the chunks data as zlib compressed nbt data
+    if chunk is None:
+        self.chunks_data.append(None)
+        return
+    chunk_data = BytesIO()
+
+    # Get the additional metadata from the old_region
+    data = region.get_chunk(chunk.x, chunk.z).data
+    nbt_data = chunk.save(data)
+
+    # Compress and save the chunk
+    nbt_data.write_file(buffer=chunk_data)
+    chunk_data.seek(0)
+    chunk_data_bytes = zlib.compress(chunk_data.read())
+    self.chunks_data.append(chunk_data_bytes)
+
+def save_region(self, file=None) -> bytes:
     """
     Returns the region as bytes with
     the anvil file format structure,
@@ -19,29 +36,11 @@ def save_region(self, file=None, region: Region = None) -> bytes:
         Either a path or a file object, if given region
         will be saved there.
     """
-    # Store all the chunks data as zlib compressed nbt data
-    chunks_data: list[Optional[bytes]] = []
-    for chunk in self.chunks:
-        if chunk is None:
-            chunks_data.append(None)
-            continue
-        chunk_data = BytesIO()
-        if isinstance(chunk, Chunk):
-            nbt_data = nbt.NBTFile()
-            nbt_data.tags.append(nbt.TAG_Int(name="DataVersion", value=chunk.version))
-            nbt_data.tags.append(chunk.data)
-        elif region is not None:
-            data = region.get_chunk(chunk.x, chunk.z).data
-            nbt_data = chunk.save(data)
-        nbt_data.write_file(buffer=chunk_data)
-        chunk_data.seek(0)
-        chunk_data_bytes = zlib.compress(chunk_data.read())
-        chunks_data.append(chunk_data_bytes)
 
     # This is what is added after the location and timestamp header
     chunks_bytes = bytes()
     offsets: list[Optional[tuple]] = []
-    for chunk in chunks_data:
+    for chunk in self.chunks_data:
         if chunk is None:
             offsets.append(None)
             continue

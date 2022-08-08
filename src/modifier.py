@@ -1,7 +1,7 @@
 import anvil  # minecraft import
 import config as cfg  # own import
 from anvil.errors import OutOfBoundsCoordinates
-from anvil_modifications import save_chunk, save_region
+from anvil_modifications import save_chunk, save_region, set_chunk
 from block_tests import is_hot, is_repl_block  # own imports
 from nbt import nbt  # minecraft import
 
@@ -24,7 +24,10 @@ class Modifier:
         anvil.EmptyChunk.save = save_chunk
         anvil.EmptyRegion.save = save_region
 
-    def modify(self, chunk, repl_chunk, new_region, chunk_x, chunk_z):
+        anvil.EmptyRegion.chunks_data = []
+        anvil.EmptyRegion.set_chunk = set_chunk
+
+    def modify(self, old_chunk, repl_chunk, new_chunk, region_id, chunk_x, chunk_z):
         x = 0
         y = 0
         z = 0
@@ -43,13 +46,13 @@ class Modifier:
         z_global = 0
 
         # Iterate all blocks and select write the new block to the new_chunk
-        for block in chunk.stream_chunk():
+        for block in old_chunk.stream_chunk():
             b = block
 
             x_region = chunk_x * cfg.CHUNK_B_X + x
             z_region = chunk_z * cfg.CHUNK_B_Z + z
-            x_global = new_region.x * cfg.REGION_B_X + x_region
-            z_global = new_region.z * cfg.REGION_B_Z + z_region
+            x_global = region_id[0] * cfg.REGION_B_X + x_region
+            z_global = region_id[1] * cfg.REGION_B_Z + z_region
 
             xyz = self.identifier.identified[x_region, y, z_region]
             if xyz == cfg.WATERBLOCK:
@@ -61,7 +64,7 @@ class Modifier:
                     b = self.get_replacement_block(repl_chunk, x, y, z)
                 else:
                     b = self.stone
-                print(f"Found AIRPOCKET Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunk_z})")
+                print(f"Found airpocket Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunk_z})")
                 print(f"GlobalPos: ({x_global}, {y}, {z_global})")
             elif xyz == cfg.SOLIDAREA:
                 if repl_chunk:
@@ -76,22 +79,21 @@ class Modifier:
                     b = diamond_block
             elif xyz != cfg.UNCHANGED:
                 print(
-                    f"Found UNIDENTIFIED Block ({x},{y},{z}) "
+                    f"Found unidentified Block ({x},{y},{z}) "
                     f"in Chunk ({chunk_x}, {chunk_z}) with {xyz}."
                 )
                 print(f"GlobalPos: ({x_global}, {y}, {z_global})")
 
             try:
-                new_region.set_block(b, x_global, y, z_global)
+                new_chunk.set_block(b, x, y, z)
             except OutOfBoundsCoordinates:
                 print(f"could not set Block ({x},{y},{z})")
 
-            # TODO
-            if z == 15 and x == 15:
+            if x == (cfg.CHUNK_B_X - 1) and z == (cfg.CHUNK_B_Z - 1):
                 y += 1
-            if x == 15:
-                z = (z + 1) % 16
-            x = (x + 1) % 16
+            if x == (cfg.CHUNK_B_X - 1):
+                z = (z + 1) % cfg.CHUNK_B_X
+            x = (x + 1) % cfg.CHUNK_B_Z
 
     def get_replacement_block(self, repl_chunk, x, y, z):
         gold_block = anvil.Block("minecraft", "gold_block")

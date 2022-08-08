@@ -174,7 +174,7 @@ class Copier:
         # Save to a file
         self.meta_info.counts.algo_step = cfg.A_SAVE
         target_dir = self.meta_info.target_dir.get()
-        new_region.save(target_dir + "/" + filename, region)
+        new_region.save(target_dir + "/" + filename)
         self.meta_info.counts.algo_step = cfg.A_FINISHED
 
         ms = int(round(time.time() * 1000))
@@ -205,10 +205,13 @@ class Copier:
 
         self.meta_info.counts.algo_step = cfg.A_MODIFY
         self.meta_info.counts.chunks_m.value = 0
-        for chunk_x in range(cfg.REGION_C_X):
+        # Iterate all chunks of a region, so the complete region can be copied
+        # chunk_z before chunk_x, order matters otherwise the chunks
+        # are not in the right direction
+        for chunk_z in range(cfg.REGION_C_X):
 
             self.meta_info.timer.start_time()
-            for chunk_z in range(cfg.REGION_C_Z):
+            for chunk_x in range(cfg.REGION_C_Z):
                 self.copy_chunk(new_region, region, repl_region, chunk_x, chunk_z)
                 self.meta_info.counts.chunks_m.value += 1
 
@@ -221,13 +224,19 @@ class Copier:
     ###############################################################################################
 
     def copy_chunk(self, new_region, region, repl_region, chunk_x, chunk_z):
-        chunk = None
+        """
+        Creates a chunk with the final data. The identified array is sampled
+        for each block and interpreted corresponding to the enabled rules.
+        After the chunk was created the chunk is assigned to the new region
+        and compressed, so it does not need that much memory.
+        """
+        old_chunk = None
         try:
-            chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
+            old_chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
         except Exception:
-            print(f"skipped non-existent chunk ({chunk_x},{chunk_z})")
+            print(f"skipped non-existent chunk ({chunk_x}, {chunk_z})")
 
-        if chunk:
+        if old_chunk:
             # TODO only when the option is ticked?
             repl_chunk = False
             if repl_region:
@@ -236,4 +245,16 @@ class Copier:
                 except Exception:
                     print(f"Could not create replacement chunk for {chunk_x}, {chunk_z}.")
 
-            self.modifier.modify(chunk, repl_chunk, new_region, chunk_x, chunk_z)
+            new_chunk = anvil.EmptyChunk(chunk_x, chunk_z)
+
+            self.modifier.modify(
+                old_chunk,
+                repl_chunk,
+                new_chunk,
+                [new_region.x, new_region.z],
+                chunk_x,
+                chunk_z
+            )
+            # Assign the new_chunk to the region, so it can be compressed.
+            # The old_region is needed for additional metadata
+            new_region.set_chunk(new_chunk, region)

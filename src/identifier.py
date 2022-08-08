@@ -37,6 +37,9 @@ class Identifier:
     def identify(self, c_regions, counts, timer):
         identified_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
 
+        self.identified = self.mp_helper.tonumpyarray(identified_shared)
+        self.identified.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+
         if self.air_pockets == 1:
             self.label_air(identified_shared, c_regions[cfg.C_A_AIR], counts, timer)
         if self.repl_blocks == 1:
@@ -45,9 +48,6 @@ class Identifier:
         # water pockets due to replacement
         if self.water_blocks == 1:
             self.label_water(identified_shared, c_regions[cfg.C_A_WATER], counts, timer)
-
-        self.identified = self.mp_helper.tonumpyarray(identified_shared)
-        self.identified.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
 
     ###############################################################################################
     # Labeling functions
@@ -152,12 +152,12 @@ class Identifier:
         self, identified_shared, labeled, c_region, counts, changed, v_idx, timer, num
     ):
         labeled_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
-        self.mp_helper.fill_shared(labeled_shared, labeled,
-            (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+        self.mp_helper.fill_shared(
+            labeled_shared, labeled, (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         )
         classified_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
-        self.mp_helper.fill_shared(classified_shared, c_region,
-            (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
+        self.mp_helper.fill_shared(
+            classified_shared, c_region, (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
         )
 
         upper_bound = int(ceil((num + 1) / cfg.PROCESSES) * cfg.PROCESSES)
@@ -169,7 +169,15 @@ class Identifier:
             mp.Pool(
                 processes=cfg.PROCESSES,
                 initializer=self.init_worker,
-                initargs=(identified_shared, labeled_shared, classified_shared, counts, changed, v_idx, timer),
+                initargs=(
+                    identified_shared,
+                    labeled_shared,
+                    classified_shared,
+                    counts,
+                    changed,
+                    v_idx,
+                    timer
+                ),
             )
         ) as pool:
             pool.map(self.worker_task, window_idxs)
