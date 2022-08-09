@@ -15,11 +15,10 @@ from tkinter import (
 )
 from tkinter.ttk import Checkbutton, Progressbar, Scrollbar
 
-import config as cfg
-
 # own imports
-from task_manager import TaskManager
+import config as cfg
 from meta_information import MetaInformation
+from task_manager import TaskManager
 
 PAD_X = 20
 PAD_Y = (10, 0)

@@ -1,6 +1,6 @@
 # mc-map-modifier
 
-[<img alt="Unit tests" src="https://img.shields.io/github/workflow/status/rwarnking/mc-map-modifier/Run%20Python%20Test?label=Build&logo=github&style=for-the-badge" height="23">](https://github.com/rwarnking/mc-map-modifier/actions/workflows/pytests.yml)
+[<img alt="Unit tests" src="https://img.shields.io/github/workflow/status/rwarnking/mc-map-modifier/Run%20Python%20Tests?label=Build&logo=github&style=for-the-badge" height="23">](https://github.com/rwarnking/mc-map-modifier/actions/workflows/pytests.yml)
 [<img alt="Linting status of master" src="https://img.shields.io/github/workflow/status/rwarnking/mc-map-modifier/Lint%20Code%20Base?label=Linter&style=for-the-badge" height="23">](https://github.com/marketplace/actions/super-linter)
 [<img alt="Version" src="https://img.shields.io/github/v/release/rwarnking/mc-map-modifier?style=for-the-badge" height="23">](https://github.com/rwarnking/mc-map-modifier/releases/latest)
 [<img alt="Licence" src="https://img.shields.io/github/license/rwarnking/mc-map-modifier?style=for-the-badge" height="23">](https://github.com/rwarnking/mc-map-modifier/blob/main/LICENSE)

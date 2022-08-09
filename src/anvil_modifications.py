@@ -23,6 +23,7 @@ def set_chunk(self, chunk, region):
     chunk_data_bytes = zlib.compress(chunk_data.read())
     self.chunks_data.append(chunk_data_bytes)
 
+
 def save_region(self, file=None) -> bytes:
     """
     Returns the region as bytes with

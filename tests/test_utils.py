@@ -9,8 +9,8 @@ from typing import List
 
 import anvil  # minecraft import
 import config as cfg
-from copier import Copier
 from meta_information import MetaInformation
+from task_manager import TaskManager
 
 
 class TestUtils:
@@ -32,8 +32,8 @@ class TestUtils:
         meta_info.repl_area.set(setting[5])
 
         # Run the copy process
-        c = Copier(meta_info)
-        c.run()
+        tm = TaskManager(meta_info)
+        tm.run()
 
         while not meta_info.text_queue.empty():
             print(meta_info.text_queue.get(0))

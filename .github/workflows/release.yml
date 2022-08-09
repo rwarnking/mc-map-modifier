@@ -1,0 +1,253 @@
+############################
+############################
+## Release GitHub Actions ##
+############################
+############################
+name: Create Release
+
+#################################
+# Start the job on push to main #
+#################################
+on:
+  push:
+    branches:
+      - master
+
+# Set the Jobs
+jobs:
+  ####################
+  # Add and push tag #
+  ####################
+  create_tag:
+    # Name the Job
+    name: Create the tag
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+
+    outputs:
+      output1: ${{ steps.createversion.outputs.result }}
+
+    # Load all steps
+    steps:
+      # Checkout the code base
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      # Get last tag
+      # https://github.com/marketplace/actions/get-latest-tag
+      - name: Get previous tag
+        id: previoustag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          fallback: 0.0.1
+      # Create new tag
+      - name: 'Get next minor version'
+        id: semvers
+        uses: "WyriHaximus/github-action-next-semvers@v1"
+        with:
+          version: ${{ steps.previoustag.outputs.tag }}
+      # Set github data
+      - name: Set access data
+        run: |
+          git config --global user.name 'rwarnking'
+          git config --global user.email 'rwarnking@users.noreply.github.com'
+      # Add and push tag
+      - name: Determine version (Major, Minor, Patch)
+        id: createversion
+        env:
+          COMMITMSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [[ "$COMMITMSG" =~ ^Major: ]]; then
+          git tag -a ${{ steps.semvers.outputs.v_major }} -m "New version ${{ steps.semvers.outputs.v_major }}"
+          git push origin ${{ steps.semvers.outputs.v_major }}
+          echo "::set-output name=result::1"
+          elif [[ "$COMMITMSG" =~ ^Minor: ]]; then
+          git tag -a ${{ steps.semvers.outputs.v_minor }} -m "New version ${{ steps.semvers.outputs.v_minor }}"
+          git push origin ${{ steps.semvers.outputs.v_minor }}
+          echo "::set-output name=result::1"
+          elif [[ "$COMMITMSG" =~ ^Patch: ]]; then
+          git tag -a ${{ steps.semvers.outputs.v_patch }} -m "New version ${{ steps.semvers.outputs.v_patch }}"
+          git push origin ${{ steps.semvers.outputs.v_patch }}
+          echo "::set-output name=result::1"
+          elif [[ "$COMMITMSG" =~ ^Update: ]]; then
+          git tag -a ${{ steps.semvers.outputs.v_patch }} -m "New version ${{ steps.semvers.outputs.v_patch }}"
+          git push origin ${{ steps.semvers.outputs.v_patch }}
+          echo "::set-output name=result::1"
+          else
+          echo "::set-output name=result::0"
+          fi
+
+  ##################
+  # Create release #
+  ##################
+  create_release:
+    # Name the Job
+    name: Create Release
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+    # Requires
+    needs: create_tag
+
+    outputs:
+      upload_url: ${{ steps.set_upload_url.outputs.upload_url }}
+      version: ${{ steps.set_version.outputs.version }}
+
+    # Load all steps
+    steps:
+      # Checkout the code base
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      # Get last tag
+      # https://github.com/marketplace/actions/get-latest-tag
+      - name: Get previous tag
+        id: previoustag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+      # Check if changelog file exists
+      - name: Check file existence
+        if: ${{ needs.create_tag.outputs.output1 == '1' }}
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: changelogs/${{ steps.previoustag.outputs.tag }}.md
+      # If not create a dummy file
+      - name: Create if file does not exist
+        if: ${{ needs.create_tag.outputs.output1 == '1' && steps.check_files.outputs.files_exists == 'false' }}
+        uses: "finnp/create-file-action@master"
+        env:
+          FILE_NAME: changelogs/${{ steps.previoustag.outputs.tag }}.md
+          FILE_DATA: "No Changelog present for version ${{ steps.previoustag.outputs.tag }}!"
+      # Create release
+      - name: Create release
+        if: ${{ needs.create_tag.outputs.output1 == '1' }}
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.previoustag.outputs.tag }}
+          release_name: Release ${{ steps.previoustag.outputs.tag }}
+          body_path: changelogs/${{ steps.previoustag.outputs.tag }}.md
+          draft: false
+          prerelease: false
+      # Setup URL
+      - id: set_upload_url
+        if: ${{ needs.create_tag.outputs.output1 == '1' }}
+        run: echo "::set-output name=upload_url::${{ steps.create_release.outputs.upload_url }}"
+      - id: set_version
+        if: ${{ needs.create_tag.outputs.output1 == '1' }}
+        run: echo "::set-output name=version::${{ steps.previoustag.outputs.tag }}"
+
+  #############################
+  # Build & Upload to release #
+  #############################
+  build_ubuntu:
+    # Name the Job
+    name: Build Ubuntu & upload to Release
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+    # Requires
+    needs: [create_tag, create_release]
+    # Load all steps
+    steps:
+      # Checkout the code base
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup python
+        uses: actions/setup-python@v2
+      - name: Build
+        run: |
+          # pip install -r requirements.txt
+          pip install setuptools
+          pip install anvil-parser
+          pip install numpy
+          pip install scipy
+          pip install scikit-image
+          pip install matplotlib
+          pip install pyinstaller
+          sh create_exe.sh
+      # Upload
+      - name: Upload
+        if: ${{ needs.create_tag.outputs.output1 == '1' }}
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./dist/application
+          asset_name: mcmapmodifier_ubuntu_${{ needs.create_release.outputs.version }}
+          asset_content_type: application/octet-stream
+
+  build_macos:
+    # Name the Job
+    name: Build MacOs & upload to Release
+    # Set the agent to run on
+    runs-on: macos-latest
+    # Requires
+    needs: [create_tag, create_release]
+    # Load all steps
+    steps:
+      # Checkout the code base
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup python
+        uses: actions/setup-python@v2
+      - name: Build
+        run: |
+          # pip install -r requirements.txt
+          pip install setuptools
+          pip install anvil-parser
+          pip install numpy
+          pip install scipy
+          pip install scikit-image
+          pip install matplotlib
+          pip install pyinstaller
+          sh create_exe.sh
+      # Upload
+      - name: Upload
+        if: ${{ needs.create_tag.outputs.output1 == '1' }}
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./dist/application
+          asset_name: mcmapmodifier_mac_${{ needs.create_release.outputs.version }}
+          asset_content_type: application/octet-stream
+
+  build_windows:
+    # Name the Job
+    name: Build Windows & upload to Release
+    # Set the agent to run on
+    runs-on: windows-latest
+    # Requires
+    needs: [create_tag, create_release]
+    # Load all steps
+    steps:
+      # Checkout the code base
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Build
+        run: |
+          # pip install -r requirements.txt
+          pip install setuptools
+          pip install anvil-parser
+          pip install numpy
+          pip install scipy
+          pip install scikit-image
+          pip install matplotlib
+          pip install pyinstaller
+          sh create_exe.sh
+      # Upload
+      - name: Upload
+        if: ${{ needs.create_tag.outputs.output1 == '1' }}
+        uses: actions/upload-release-asset@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./dist/application.exe
+          asset_name: mcmapmodifier_win_${{ needs.create_release.outputs.version }}.exe
+          asset_content_type: application/octet-stream

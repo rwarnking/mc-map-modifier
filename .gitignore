@@ -5,3 +5,8 @@ __pycache__/
 
 # Cython debug symbols
 cython_debug/
+
+# pyinstaller
+application.spec
+dist
+build

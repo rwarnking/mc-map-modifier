@@ -8,13 +8,12 @@ from tkinter import messagebox  # Gui TODO
 # minecraft import
 import anvil
 import config as cfg
+from anvil_modifications import save_chunk, save_region, set_chunk
 
 # Own imports
 from classifier_mp import ClassifierMP
-from copier_mp import CopierMP
 from identifier import Identifier
 from modifier import Modifier
-from anvil_modifications import save_chunk, save_region, set_chunk
 
 
 class TaskManager:

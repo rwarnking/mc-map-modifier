@@ -1,7 +1,6 @@
 import anvil  # minecraft import
 import config as cfg  # own import
 from anvil.errors import OutOfBoundsCoordinates
-from anvil_modifications import save_chunk, save_region, set_chunk
 from block_tests import is_hot, is_repl_block  # own imports
 from nbt import nbt  # minecraft import
 
@@ -19,7 +18,6 @@ class Modifier:
         self.rail = anvil.Block("minecraft", "rail")
         self.powered_rail = anvil.Block("minecraft", "powered_rail")
 
-
     def modify(self, new_region, old_region, repl_region, counts, timer):
         # Iterate all chunks of a region, so the complete region can be copied
         # chunk_z before chunk_x, order matters otherwise the chunks
@@ -34,7 +32,7 @@ class Modifier:
             timer.end_time()
             timer.update_m_elapsed(counts)
 
-        ###############################################################################################
+    ###############################################################################################
 
     def modify_chunk(self, new_region, old_region, repl_region, chunk_x, chunk_z):
         """
@@ -61,7 +59,11 @@ class Modifier:
             new_chunk = anvil.EmptyChunk(chunk_x, chunk_z)
 
             self.select_chunk_blocks(
-                old_chunk, repl_chunk, new_chunk, [new_region.x, new_region.z], chunk_x,
+                old_chunk,
+                repl_chunk,
+                new_chunk,
+                [new_region.x, new_region.z],
+                chunk_x,
                 chunk_z,
             )
             # Assign the new_chunk to the region, so it can be compressed.
