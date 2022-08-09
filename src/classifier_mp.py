@@ -97,9 +97,8 @@ class ClassifierMP:
             shared_arrays[cfg.C_A_WATER][r_x, y, r_z] = get_water_type(block.id)
             shared_arrays[cfg.C_A_REPL][r_x, y, r_z] = get_repl_type(block.id)
 
-            # TODO chunk_b_x
-            if z == 15 and x == 15:
+            if x == (cfg.CHUNK_B_X - 1) and z == (cfg.CHUNK_B_Z - 1):
                 y += 1
-            if x == 15:
-                z = (z + 1) % 16
-            x = (x + 1) % 16
+            if x == (cfg.CHUNK_B_X - 1):
+                z = (z + 1) % cfg.CHUNK_B_Z
+            x = (x + 1) % cfg.CHUNK_B_X

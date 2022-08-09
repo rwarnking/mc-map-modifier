@@ -3,7 +3,6 @@ import zlib
 from io import BytesIO
 from typing import Optional
 
-from anvil import Chunk, Region
 from nbt import nbt
 
 

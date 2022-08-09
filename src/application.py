@@ -18,7 +18,7 @@ from tkinter.ttk import Checkbutton, Progressbar, Scrollbar
 import config as cfg
 
 # own imports
-from copier import Copier
+from task_manager import TaskManager
 from meta_information import MetaInformation
 
 PAD_X = 20
@@ -49,9 +49,9 @@ class MainApp:
             window.after(50, lambda: self.listen_for_result(window))
             return
 
-        c = Copier(self.meta_info)
+        tm = TaskManager(self.meta_info)
         self.meta_info.finished = False
-        self.new_thread = threading.Thread(target=c.run)
+        self.new_thread = threading.Thread(target=tm.run)
         self.new_thread.start()
         window.after(50, lambda: self.listen_for_result(window))
 

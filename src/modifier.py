@@ -19,15 +19,56 @@ class Modifier:
         self.rail = anvil.Block("minecraft", "rail")
         self.powered_rail = anvil.Block("minecraft", "powered_rail")
 
-        # https://tryolabs.com/blog/2013/07/05/run-time-method-patching-python/
-        # TODO put this somewhere else?
-        anvil.EmptyChunk.save = save_chunk
-        anvil.EmptyRegion.save = save_region
 
-        anvil.EmptyRegion.chunks_data = []
-        anvil.EmptyRegion.set_chunk = set_chunk
+    def modify(self, new_region, old_region, repl_region, counts, timer):
+        # Iterate all chunks of a region, so the complete region can be copied
+        # chunk_z before chunk_x, order matters otherwise the chunks
+        # are not in the right direction
+        for chunk_z in range(cfg.REGION_C_X):
 
-    def modify(self, old_chunk, repl_chunk, new_chunk, region_id, chunk_x, chunk_z):
+            timer.start_time()
+            for chunk_x in range(cfg.REGION_C_Z):
+                self.modify_chunk(new_region, old_region, repl_region, chunk_x, chunk_z)
+                counts.chunks_m.value += 1
+
+            timer.end_time()
+            timer.update_m_elapsed(counts)
+
+        ###############################################################################################
+
+    def modify_chunk(self, new_region, old_region, repl_region, chunk_x, chunk_z):
+        """
+        Creates a chunk with the final data. The identified array is sampled
+        for each block and interpreted corresponding to the enabled rules.
+        After the chunk was created the chunk is assigned to the new region
+        and compressed, so it does not need that much memory.
+        """
+        old_chunk = None
+        try:
+            old_chunk = anvil.Chunk.from_region(old_region, chunk_x, chunk_z)
+        except Exception:
+            print(f"skipped non-existent chunk ({chunk_x}, {chunk_z})")
+
+        if old_chunk:
+            # TODO only when the option is ticked?
+            repl_chunk = False
+            if repl_region:
+                try:
+                    repl_chunk = anvil.Chunk.from_region(repl_region, chunk_x, chunk_z)
+                except Exception:
+                    print(f"Could not create replacement chunk for {chunk_x}, {chunk_z}.")
+
+            new_chunk = anvil.EmptyChunk(chunk_x, chunk_z)
+
+            self.select_chunk_blocks(
+                old_chunk, repl_chunk, new_chunk, [new_region.x, new_region.z], chunk_x,
+                chunk_z,
+            )
+            # Assign the new_chunk to the region, so it can be compressed.
+            # The old_region is needed for additional metadata
+            new_region.set_chunk(new_chunk, old_region)
+
+    def select_chunk_blocks(self, old_chunk, repl_chunk, new_chunk, region_id, chunk_x, chunk_z):
         x = 0
         y = 0
         z = 0
@@ -46,6 +87,8 @@ class Modifier:
         z_global = 0
 
         # Iterate all blocks and select write the new block to the new_chunk
+        # Even though the block is sometimes overriden it is faster to use
+        # the stream_chunk option than using old_chunk.get_block(...)
         for block in old_chunk.stream_chunk():
             b = block
 
@@ -92,8 +135,8 @@ class Modifier:
             if x == (cfg.CHUNK_B_X - 1) and z == (cfg.CHUNK_B_Z - 1):
                 y += 1
             if x == (cfg.CHUNK_B_X - 1):
-                z = (z + 1) % cfg.CHUNK_B_X
-            x = (x + 1) % cfg.CHUNK_B_Z
+                z = (z + 1) % cfg.CHUNK_B_Z
+            x = (x + 1) % cfg.CHUNK_B_X
 
     def get_replacement_block(self, repl_chunk, x, y, z):
         gold_block = anvil.Block("minecraft", "gold_block")
@@ -108,43 +151,9 @@ class Modifier:
 
         return b
 
-    # TODO using multi processing for the block assignment to the chunks was tried once
-    # using the multiprocessing manager list, this did not lead to acceptable results,
-    # since the needed time for 100 elements was already similar to the complete duration
-    # of the single process function. The problem may be the big data structure that is build
-    # and needs to be serialised for the shared usage. Using a different type of multiprocessing
-    # may solve this but was not tried.
-    # def copy_chunks_mp(self, new_region, region, repl_region):
-    #     # Create pairs to index the different chunks -> (0, 0) (0, 1) (0, m) (1, 0) (2, 0) (n, m)
-    #     # TODO
-    #     import itertools
-    #     import multiprocessing as mp
-    #     from contextlib import closing
-    #     window_idxs = [
-    #         (i, j) for i, j in
-    #         itertools.product(range(cfg.REGION_C_X), range(cfg.REGION_C_Z))
-    #     ]
-
-    #     import multiprocessing
-    #     manager = multiprocessing.Manager()
-    #     chunks = manager.list([None] * 1024)
-
-    #     with closing(
-    #         mp.Pool(
-    #             processes=4,
-    #             initializer=self.init_worker,
-    #             initargs=(new_region, region, repl_region, chunks)
-    #         )
-    #     ) as pool:
-    #         pool.map(self.worker_task, window_idxs)
-
-    #     pool.close()
-    #     pool.join()
-
-    #     new_region.chunks = chunks
-
     ###############################################################################################
-
+    # Tunnel functions
+    ###############################################################################################
     # self.make_tunnel([500,0,0], [2000,0,1024])
     # self.make_tunnel([0,0,500], [1000,0,2000])
     def make_tunnel(self, region, new_region, rX, rZ, start, end):

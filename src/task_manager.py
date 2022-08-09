@@ -11,16 +11,26 @@ import config as cfg
 
 # Own imports
 from classifier_mp import ClassifierMP
+from copier_mp import CopierMP
 from identifier import Identifier
 from modifier import Modifier
+from anvil_modifications import save_chunk, save_region, set_chunk
 
 
-class Copier:
+class TaskManager:
     def __init__(self, meta_info):
         self.meta_info = meta_info
 
         self.identifier = Identifier(self.meta_info)
         self.modifier = Modifier(self.identifier)
+
+        # https://tryolabs.com/blog/2013/07/05/run-time-method-patching-python/
+        # TODO put this somewhere else?
+        anvil.EmptyChunk.save = save_chunk
+        anvil.EmptyRegion.save = save_region
+
+        anvil.EmptyRegion.chunks_data = []
+        anvil.EmptyRegion.set_chunk = set_chunk
 
     ###############################################################################################
     # Main
@@ -94,7 +104,7 @@ class Copier:
         for filename in filelist:
             if filename.endswith(".mca"):
                 # TODO combine path and filename here ?
-                self.copyRegion(filename)
+                self.process_region(filename)
             else:
                 continue
             self.meta_info.file_count = i
@@ -115,7 +125,7 @@ class Copier:
         self.meta_info.finished = True
 
     ###############################################################################################
-    def copyRegion(self, filename):
+    def process_region(self, filename):
         end = filename.split(".")
         rX = int(end[1])
         rZ = int(end[2])
@@ -123,7 +133,7 @@ class Copier:
         # Create a new region with the `EmptyRegion` class at region coords
         new_region = anvil.EmptyRegion(rX, rZ)
         src_dir = self.meta_info.source_dir.get()
-        region = anvil.Region.from_file(src_dir + "/" + filename)
+        old_region = anvil.Region.from_file(src_dir + "/" + filename)
 
         repl_region = False
         if self.repl_blocks:
@@ -136,7 +146,7 @@ class Copier:
         ##########################################
         # Main function call
         ##########################################
-        self.copy_chunks(new_region, region, repl_region)
+        self.process_chunks(new_region, old_region, repl_region)
 
         if self.water_blocks + self.air_pockets + self.repl_blocks >= 1:
             self.meta_info.text_queue.put(f"In file {filename}:\n")
@@ -154,7 +164,57 @@ class Copier:
                 "solid blocks to replacement solid blocks.\n"
             )
 
-        ms = int(round(time.time() * 1000))
+        ms1 = int(round(time.time() * 1000))
+
+        # Save region to a file
+        self.meta_info.counts.algo_step = cfg.A_SAVE
+        target_dir = self.meta_info.target_dir.get()
+        new_region.save(target_dir + "/" + filename)
+        self.meta_info.counts.algo_step = cfg.A_FINISHED
+
+        ms2 = int(round(time.time() * 1000))
+        print(f"Save time: {ms2 - ms1}")
+
+    ###############################################################################################
+
+    def process_chunks(self, new_region, old_region, repl_region):
+        ms1 = int(round(time.time() * 1000))
+
+        ##################
+        # Classification #
+        ##################
+        # TODO combine these into a function?
+        self.meta_info.counts.algo_step = cfg.A_CLASSIFY
+        self.meta_info.counts.chunks_c.value = 0
+        classifier_mp = ClassifierMP(self.meta_info)
+        if self.air_pockets + self.repl_blocks + self.water_blocks > 0:
+            classifier_mp.classify_all_mp(old_region, self.meta_info.counts, self.meta_info.timer)
+
+        ms2 = int(round(time.time() * 1000))
+        print(f"Classifier time: {ms2 - ms1}")
+
+        ##################
+        # Identification #
+        ##################
+        self.meta_info.counts.algo_step = cfg.A_IDENTIFY
+        self.identifier.identify(
+            classifier_mp.c_regions, self.meta_info.counts, self.meta_info.timer
+        )
+
+        ms3 = int(round(time.time() * 1000))
+        print(f"Identifier time: {ms3 - ms2}")
+
+        ################
+        # Modification #
+        ################
+        self.meta_info.counts.algo_step = cfg.A_MODIFY
+        self.meta_info.counts.chunks_m.value = 0
+        self.modifier.modify(
+            new_region, old_region, repl_region, self.meta_info.counts, self.meta_info.timer
+        )
+
+        ms4 = int(round(time.time() * 1000))
+        print(f"Modify time: {ms4 - ms3}")
 
         ##########################################
         # Other modifications
@@ -168,93 +228,5 @@ class Copier:
         # self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 60, 100], [225, 60, 350])
         # self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 100, 100], [325, 100, 250])
 
-        ms2 = int(round(time.time() * 1000))
-        print(f"Tunnel time: {ms2 - ms}")
-
-        # Save to a file
-        self.meta_info.counts.algo_step = cfg.A_SAVE
-        target_dir = self.meta_info.target_dir.get()
-        new_region.save(target_dir + "/" + filename)
-        self.meta_info.counts.algo_step = cfg.A_FINISHED
-
-        ms = int(round(time.time() * 1000))
-        print(f"Save time: {ms - ms2}")
-
-    ###############################################################################################
-
-    def copy_chunks(self, new_region, region, repl_region):
-        ms = int(round(time.time() * 1000))
-
-        # TODO combine these into a function?
-        self.meta_info.counts.algo_step = cfg.A_CLASSIFY
-        self.meta_info.counts.chunks_c.value = 0
-        classifier_mp = ClassifierMP(self.meta_info)
-        if self.air_pockets + self.repl_blocks + self.water_blocks > 0:
-            classifier_mp.classify_all_mp(region, self.meta_info.counts, self.meta_info.timer)
-
-        ms2 = int(round(time.time() * 1000))
-        print(f"Classifier time: {ms2 - ms}")
-
-        self.meta_info.counts.algo_step = cfg.A_IDENTIFY
-        self.identifier.identify(
-            classifier_mp.c_regions, self.meta_info.counts, self.meta_info.timer
-        )
-
-        ms3 = int(round(time.time() * 1000))
-        print(f"Identifier time: {ms3 - ms2}")
-
-        self.meta_info.counts.algo_step = cfg.A_MODIFY
-        self.meta_info.counts.chunks_m.value = 0
-        # Iterate all chunks of a region, so the complete region can be copied
-        # chunk_z before chunk_x, order matters otherwise the chunks
-        # are not in the right direction
-        for chunk_z in range(cfg.REGION_C_X):
-
-            self.meta_info.timer.start_time()
-            for chunk_x in range(cfg.REGION_C_Z):
-                self.copy_chunk(new_region, region, repl_region, chunk_x, chunk_z)
-                self.meta_info.counts.chunks_m.value += 1
-
-            self.meta_info.timer.end_time()
-            self.meta_info.timer.update_m_elapsed(self.meta_info.counts)
-
-        ms4 = int(round(time.time() * 1000))
-        print(f"Modify time: {ms4 - ms3}")
-
-    ###############################################################################################
-
-    def copy_chunk(self, new_region, region, repl_region, chunk_x, chunk_z):
-        """
-        Creates a chunk with the final data. The identified array is sampled
-        for each block and interpreted corresponding to the enabled rules.
-        After the chunk was created the chunk is assigned to the new region
-        and compressed, so it does not need that much memory.
-        """
-        old_chunk = None
-        try:
-            old_chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
-        except Exception:
-            print(f"skipped non-existent chunk ({chunk_x}, {chunk_z})")
-
-        if old_chunk:
-            # TODO only when the option is ticked?
-            repl_chunk = False
-            if repl_region:
-                try:
-                    repl_chunk = anvil.Chunk.from_region(repl_region, chunk_x, chunk_z)
-                except Exception:
-                    print(f"Could not create replacement chunk for {chunk_x}, {chunk_z}.")
-
-            new_chunk = anvil.EmptyChunk(chunk_x, chunk_z)
-
-            self.modifier.modify(
-                old_chunk,
-                repl_chunk,
-                new_chunk,
-                [new_region.x, new_region.z],
-                chunk_x,
-                chunk_z
-            )
-            # Assign the new_chunk to the region, so it can be compressed.
-            # The old_region is needed for additional metadata
-            new_region.set_chunk(new_chunk, region)
+        ms5 = int(round(time.time() * 1000))
+        print(f"Tunnel time: {ms5 - ms4}")
