@@ -4,10 +4,16 @@ from anvil.errors import OutOfBoundsCoordinates
 from block_tests import is_hot, is_repl_block  # own imports
 from nbt import nbt  # minecraft import
 
+from identifier import Identifier
+from meta_information import MetaInformation
 
 class Modifier:
-    def __init__(self, identifier):
+    def __init__(self, meta_info : MetaInformation, identifier : Identifier):
         self.identifier = identifier
+        self.add_tunnel = meta_info.add_tunnel.get()
+
+        self.tunnel_start = meta_info.get_tunnel_start()
+        self.tunnel_end = meta_info.get_tunnel_end()
 
         self.air = anvil.Block("minecraft", "air")
         self.stone = anvil.Block("minecraft", "stone")
@@ -18,147 +24,27 @@ class Modifier:
         self.rail = anvil.Block("minecraft", "rail")
         self.powered_rail = anvil.Block("minecraft", "powered_rail")
 
-    def modify(self, new_region, old_region, repl_region, counts, timer):
-        # Iterate all chunks of a region, so the complete region can be copied
-        # chunk_z before chunk_x, order matters otherwise the chunks
-        # are not in the right direction
-        for chunk_z in range(cfg.REGION_C_X):
-
-            timer.start_time()
-            for chunk_x in range(cfg.REGION_C_Z):
-                self.modify_chunk(new_region, old_region, repl_region, chunk_x, chunk_z)
-                counts.chunks_m.value += 1
-
-            timer.end_time()
-            timer.update_m_elapsed(counts)
-
-    ###############################################################################################
-
-    def modify_chunk(self, new_region, old_region, repl_region, chunk_x, chunk_z):
-        """
-        Creates a chunk with the final data. The identified array is sampled
-        for each block and interpreted corresponding to the enabled rules.
-        After the chunk was created the chunk is assigned to the new region
-        and compressed, so it does not need that much memory.
-        """
-        old_chunk = None
-        try:
-            old_chunk = anvil.Chunk.from_region(old_region, chunk_x, chunk_z)
-        except Exception:
-            print(f"skipped non-existent chunk ({chunk_x}, {chunk_z})")
-
-        if old_chunk:
-            # TODO only when the option is ticked?
-            repl_chunk = False
-            if repl_region:
-                try:
-                    repl_chunk = anvil.Chunk.from_region(repl_region, chunk_x, chunk_z)
-                except Exception:
-                    print(f"Could not create replacement chunk for {chunk_x}, {chunk_z}.")
-
-            new_chunk = anvil.EmptyChunk(chunk_x, chunk_z)
-
-            self.select_chunk_blocks(
-                old_chunk,
-                repl_chunk,
-                new_chunk,
-                [new_region.x, new_region.z],
-                chunk_x,
-                chunk_z,
-            )
-            # Assign the new_chunk to the region, so it can be compressed.
-            # The old_region is needed for additional metadata
-            new_region.set_chunk(new_chunk, old_region)
-
-    def select_chunk_blocks(self, old_chunk, repl_chunk, new_chunk, region_id, chunk_x, chunk_z):
-        x = 0
-        y = 0
-        z = 0
-
-        # Create `Block` objects that are used to set blocks
-        water = anvil.Block("minecraft", "water")
-        diamond_block = anvil.Block("minecraft", "diamond_block")
-        # gold_block = anvil.Block("minecraft", "gold_block")
-        # blue_wool = anvil.Block("minecraft", "blue_wool")
-
-        b = 0
-        xyz = 0
-        x_region = 0
-        z_region = 0
-        x_global = 0
-        z_global = 0
-
-        # Iterate all blocks and select write the new block to the new_chunk
-        # Even though the block is sometimes overriden it is faster to use
-        # the stream_chunk option than using old_chunk.get_block(...)
-        for block in old_chunk.stream_chunk():
-            b = block
-
-            x_region = chunk_x * cfg.CHUNK_B_X + x
-            z_region = chunk_z * cfg.CHUNK_B_Z + z
-            x_global = region_id[0] * cfg.REGION_B_X + x_region
-            z_global = region_id[1] * cfg.REGION_B_Z + z_region
-
-            xyz = self.identifier.identified[x_region, y, z_region]
-            if xyz == cfg.WATERBLOCK:
-                b = water
-                print(f"Found water Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunk_z})")
-                print(f"GlobalPos: ({x_global}, {y}, {z_global})")
-            elif xyz == cfg.AIRPOCKET:
-                if repl_chunk:
-                    b = self.get_replacement_block(repl_chunk, x, y, z)
-                else:
-                    b = self.stone
-                print(f"Found airpocket Block ({x},{y},{z}) in Chunk ({chunk_x}, {chunk_z})")
-                print(f"GlobalPos: ({x_global}, {y}, {z_global})")
-            elif xyz == cfg.SOLIDAREA:
-                if repl_chunk:
-                    b = self.get_replacement_block(repl_chunk, x, y, z)
-                # b = self.get_replacement_block(repl_chunk, x, y, z)
-                if repl_chunk:
-                    new_block = repl_chunk.get_block(x, y, z)
-                    # Replace the block if it is solid but use the original when it is not
-                    if is_repl_block(new_block.id):
-                        b = new_block
-                    # TODO debug version
-                    b = diamond_block
-            elif xyz != cfg.UNCHANGED:
-                print(
-                    f"Found unidentified Block ({x},{y},{z}) "
-                    f"in Chunk ({chunk_x}, {chunk_z}) with {xyz}."
-                )
-                print(f"GlobalPos: ({x_global}, {y}, {z_global})")
-
-            try:
-                new_chunk.set_block(b, x, y, z)
-            except OutOfBoundsCoordinates:
-                print(f"could not set Block ({x},{y},{z})")
-
-            if x == (cfg.CHUNK_B_X - 1) and z == (cfg.CHUNK_B_Z - 1):
-                y += 1
-            if x == (cfg.CHUNK_B_X - 1):
-                z = (z + 1) % cfg.CHUNK_B_Z
-            x = (x + 1) % cfg.CHUNK_B_X
-
-    def get_replacement_block(self, repl_chunk, x, y, z):
-        gold_block = anvil.Block("minecraft", "gold_block")
-
-        b = gold_block
-        # if repl_chunk:
-        #     new_block = repl_chunk.get_block(x, y, z)
-        #     # TODO expand is_solid list
-        #     if is_solid(new_block.id):
-        #         b = new_block
-        #         b = blue_wool
-
-        return b
+    def modify(self, regions):
+        if self.add_tunnel == 1:
+            self.make_tunnel(regions, self.tunnel_start, self.tunnel_end)
 
     ###############################################################################################
     # Tunnel functions
     ###############################################################################################
     # self.make_tunnel([500,0,0], [2000,0,1024])
     # self.make_tunnel([0,0,500], [1000,0,2000])
-    def make_tunnel(self, region, new_region, rX, rZ, start, end):
+    def make_tunnel(self, regions, start, end):
+        """
+        Adds a tunnel to the new region in regions (new_r) starting at
+        the start coordinates leading to the end coordinates.
+        When processing the coordinates, they are clamped such that only
+        the positions inside the current region are used preventing out of bounds.
+        """
+        old_r = regions["old_r"]
+        new_r = regions["new_r"]
+        rX = new_r.x
+        rZ = new_r.z
+
         # Get region files from global position
         start_r_x = int(start[0] / cfg.REGION_B_X)
         start_r_z = int(start[2] / cfg.REGION_B_Z)
@@ -188,84 +74,95 @@ class Modifier:
             direction = cfg.M_DIR_Z
 
         # TODO height is not dynamic (start[1])
+        # Clamp the x and z coordinates to match this region
         if dir_r_z == rZ and start_r_x <= rX and end_r_x >= rX:
             this_min_x = start[0] if (start[0] > region_min_x) else region_min_x
             this_max_x = end[0] if (end[0] < region_max_x) else region_max_x
             for x in range(this_min_x, this_max_x):
-                self.set_5x5_x(region, new_region, x, start[1], new_z, x % torch_dist == 0)
+                self.set_5x5_x(old_r, new_r, x, start[1], new_z, x % torch_dist == 0)
         if dir_r_x == rX and start_r_z <= rZ and end_r_z >= rZ:
             this_min_z = start[2] if (start[2] > region_min_z) else region_min_z
             this_max_z = end[2] if (end[2] < region_max_z) else region_max_z
             for z in range(this_min_z, this_max_z):
-                self.set_5x5_z(region, new_region, new_x, start[1], z, z % torch_dist == 0)
+                self.set_5x5_z(old_r, new_r, new_x, start[1], z, z % torch_dist == 0)
 
         # corner = start[0] != end[0] and start[2] != end[2]
         # self.fix_corner(new_region, start, end)
 
         # TODO gui
         if True:
-            self.place_chests(region, new_region, start[0], start[1], start[2], direction)
+            self.place_chests(old_r, new_r, start[0], start[1], start[2], direction)
 
     # TODO these 2 functions should be combinable
-    def set_5x5_x(self, region, new_region, x, y, z, place_torch):
-        self.set_3x3(new_region, x, y, z, place_torch)
-        self.get_blocks_3x3(region, x, y, z)
+    def set_5x5_x(self, old_r, new_r, x, y, z, place_torch):
+        self.set_3x3(new_r, x, y, z, place_torch)
+        self.get_blocks_3x3(old_r, x, y, z)
 
         # Top layer
         for add_z in range(-2, 3):
-            b = self.get_border_block(region, x, y + 3, z + add_z)
-            new_region.set_block(b, x, y + 2, z + add_z)
+            b = self.get_border_block(old_r, x, y + 3, z + add_z)
+            new_r.set_block(b, x, y + 2, z + add_z)
+            self.identifier.identified[x, y + 2, z + add_z] = cfg.TUNNEL
 
         # Bottom layer
         for add_z in range(-2, 3):
-            b = self.get_border_block(region, x, y - 3, z + add_z)
-            new_region.set_block(b, x, y - 2, z + add_z)
+            b = self.get_border_block(old_r, x, y - 3, z + add_z)
+            new_r.set_block(b, x, y - 2, z + add_z)
+            self.identifier.identified[x, y - 2, z + add_z] = cfg.TUNNEL
 
         # Left and right
         for add_y in range(-2, 3):
-            b = self.get_border_block(region, x, y + add_y, z - 3)
-            new_region.set_block(b, x, y + add_y, z - 2)
-            b = self.get_border_block(region, x, y + add_y, z + 3)
-            new_region.set_block(b, x, y + add_y, z + 2)
+            b = self.get_border_block(old_r, x, y + add_y, z - 3)
+            new_r.set_block(b, x, y + add_y, z - 2)
+            self.identifier.identified[x, y + add_y, z - 2] = cfg.TUNNEL
+            b = self.get_border_block(old_r, x, y + add_y, z + 3)
+            new_r.set_block(b, x, y + add_y, z + 2)
+            self.identifier.identified[x, y + add_y, z + 2] = cfg.TUNNEL
 
         if place_torch:
-            self.place_r_torch(region, new_region, x, y, z)
+            self.place_r_torch(old_r, new_r, x, y, z)
 
-    def set_5x5_z(self, region, new_region, x, y, z, place_torch):
-        self.set_3x3(new_region, x, y, z, place_torch, cfg.M_DIR_Z)
-        self.get_blocks_3x3(region, x, y, z)
+    def set_5x5_z(self, old_r, new_r, x, y, z, place_torch):
+        self.set_3x3(new_r, x, y, z, place_torch, cfg.M_DIR_Z)
+        self.get_blocks_3x3(old_r, x, y, z)
 
         # Top layer
         for add_x in range(-2, 3):
-            b = self.get_border_block(region, x + add_x, y + 3, z)
-            new_region.set_block(b, x + add_x, y + 2, z)
+            b = self.get_border_block(old_r, x + add_x, y + 3, z)
+            new_r.set_block(b, x + add_x, y + 2, z)
+            self.identifier.identified[x + add_x, y + 2, z] = cfg.TUNNEL
 
         # Bottom layer
         for add_x in range(-2, 3):
-            b = self.get_border_block(region, x + add_x, y - 3, z)
-            new_region.set_block(b, x + add_x, y - 2, z)
+            b = self.get_border_block(old_r, x + add_x, y - 3, z)
+            new_r.set_block(b, x + add_x, y - 2, z)
+            self.identifier.identified[x + add_x, y - 2, z] = cfg.TUNNEL
 
         # Left and right
         for add_y in range(-2, 3):
-            b = self.get_border_block(region, x - 3, y + add_y, z)
-            new_region.set_block(b, x - 2, y + add_y, z)
-            b = self.get_border_block(region, x + 3, y + add_y, z)
-            new_region.set_block(b, x + 2, y + add_y, z)
+            b = self.get_border_block(old_r, x - 3, y + add_y, z)
+            new_r.set_block(b, x - 2, y + add_y, z)
+            self.identifier.identified[x - 2, y + add_y, z] = cfg.TUNNEL
+            b = self.get_border_block(old_r, x + 3, y + add_y, z)
+            new_r.set_block(b, x + 2, y + add_y, z)
+            self.identifier.identified[x + 2, y + add_y, z] = cfg.TUNNEL
 
         if place_torch:
-            self.place_r_torch(region, new_region, x, y, z)
+            self.place_r_torch(old_r, new_r, x, y, z)
 
-    def place_r_torch(self, region, new_region, x, y, z):
-        if self.test_floor(region, x, y, z):
+    def place_r_torch(self, old_r, new_region, x, y, z):
+        if self.test_floor(old_r, x, y, z):
             for i in range(-1, 2):
                 for j in range(0, 2):
                     for k in range(-1, 2):
                         new_region.set_block(self.stone, x + i, y - 3 - j, z + k)
             new_region.set_block(self.r_torch, x, y - 3, z)
+            self.identifier.identified[x, y - 3, z] = cfg.TUNNEL
         else:
             new_region.set_block(self.r_torch, x + 1, y - 1, z)
+            self.identifier.identified[x + 1, y - 1, z] = cfg.TUNNEL
 
-    def set_3x3(self, r, x, y, z, place_torch, direction=cfg.M_DIR_X):
+    def set_3x3(self, new_r, x, y, z, place_torch, direction=cfg.M_DIR_X):
         torch = self.torch if place_torch else self.air
         rail = self.powered_rail if place_torch else self.rail
         if place_torch:
@@ -283,23 +180,32 @@ class Modifier:
             z_p_one = z + 1
 
         # Middle layer -> air
-        r.set_block(self.air, x, y, z)
-        r.set_block(self.air, x_m_one, y, z_m_one)
-        r.set_block(self.air, x_p_one, y, z_p_one)
+        new_r.set_block(self.air, x, y, z)
+        new_r.set_block(self.air, x_m_one, y, z_m_one)
+        new_r.set_block(self.air, x_p_one, y, z_p_one)
+        self.identifier.identified[x, y, z] = cfg.TUNNEL
+        self.identifier.identified[x_m_one, y, z_m_one] = cfg.TUNNEL
+        self.identifier.identified[x_p_one, y, z_p_one] = cfg.TUNNEL
         # Top layer -> air
-        r.set_block(self.air, x, y + 1, z)
-        r.set_block(self.air, x_m_one, y + 1, z_m_one)
-        r.set_block(self.air, x_p_one, y + 1, z_p_one)
+        new_r.set_block(self.air, x, y + 1, z)
+        new_r.set_block(self.air, x_m_one, y + 1, z_m_one)
+        new_r.set_block(self.air, x_p_one, y + 1, z_p_one)
+        self.identifier.identified[x, y + 1, z] = cfg.TUNNEL
+        self.identifier.identified[x_m_one, y + 1, z_m_one] = cfg.TUNNEL
+        self.identifier.identified[x_p_one, y + 1, z_p_one] = cfg.TUNNEL
         # Bot layer -> air, torches, rails and powered rails
-        r.set_block(torch, x_m_one, y - 1, z_m_one)
-        r.set_block(rail, x, y - 1, z)
-        r.set_block(torch, x_p_one, y - 1, z_p_one)
+        new_r.set_block(torch, x_m_one, y - 1, z_m_one)
+        new_r.set_block(rail, x, y - 1, z)
+        new_r.set_block(torch, x_p_one, y - 1, z_p_one)
+        self.identifier.identified[x_m_one, y - 1, z_m_one] = cfg.TUNNEL
+        self.identifier.identified[x, y - 1, z] = cfg.TUNNEL
+        self.identifier.identified[x_p_one, y - 1, z_p_one] = cfg.TUNNEL
 
-    def get_border_block(self, region, x, y, z):
+    def get_border_block(self, old_r, x, y, z):
         block_r_x = x % cfg.REGION_B_X
         block_r_z = z % cfg.REGION_B_Z
         chunk = anvil.Chunk.from_region(
-            region, int(block_r_x / cfg.CHUNK_B_X), int(block_r_z / cfg.CHUNK_B_Z)
+            old_r, int(block_r_x / cfg.CHUNK_B_X), int(block_r_z / cfg.CHUNK_B_Z)
         )
         block = chunk.get_block(block_r_x % cfg.CHUNK_B_X, y, block_r_z % cfg.CHUNK_B_Z)
 
@@ -308,14 +214,14 @@ class Modifier:
         else:
             return self.stone
 
-    def test_floor(self, region, x, y, z):
+    def test_floor(self, old_r, x, y, z):
         y_n = y - 2
         block_r_x = x % cfg.REGION_B_X
         block_r_z = z % cfg.REGION_B_Z
         for i in range(-1, 2):
             for k in range(-1, 2):
                 chunk = anvil.Chunk.from_region(
-                    region, int(block_r_x / cfg.CHUNK_B_X), int(block_r_z / cfg.CHUNK_B_Z)
+                    old_r, int(block_r_x / cfg.CHUNK_B_X), int(block_r_z / cfg.CHUNK_B_Z)
                 )
                 block = chunk.get_block(block_r_x % cfg.CHUNK_B_X, y_n, block_r_z % cfg.CHUNK_B_Z)
                 if is_hot(block.id):
@@ -330,14 +236,14 @@ class Modifier:
     #     if abs(end[0] - start[0]) < abs(end[2] - start[2]):
     #         corner_pos = [start[0], start[1], end[2]]
 
-    def get_blocks_3x3(self, region, x, y, z):
+    def get_blocks_3x3(self, old_r, x, y, z):
         for i in range(-1, 2):
             for j in range(-1, 2):
                 for k in range(-1, 2):
                     block_r_x = (x + i) % cfg.REGION_B_X
                     block_r_z = (z + k) % cfg.REGION_B_Z
                     chunk = anvil.Chunk.from_region(
-                        region, int(block_r_x / cfg.CHUNK_B_X), int(block_r_z / cfg.CHUNK_B_Z)
+                        old_r, int(block_r_x / cfg.CHUNK_B_X), int(block_r_z / cfg.CHUNK_B_Z)
                     )
                     block = chunk.get_block(
                         block_r_x % cfg.CHUNK_B_X, y + j, block_r_z % cfg.CHUNK_B_Z
@@ -349,7 +255,7 @@ class Modifier:
                         else:
                             self.item_dict[block.id] = 1
 
-    def place_chests(self, region, new_region, x, y, z, direction):
+    def place_chests(self, old_r, new_r, x, y, z, direction):
         # add_x = 1
         # add_z = 0
         chest = anvil.Block("minecraft", "chest")
@@ -378,7 +284,8 @@ class Modifier:
                     chest_x = x + i
                     chest_z = z + 1
 
-                new_region.set_block(chest, chest_x, chest_y, chest_z)
+                new_r.set_block(chest, chest_x, chest_y, chest_z)
+                self.identifier.identified[chest_x, chest_y, chest_z] = cfg.TUNNEL
 
                 item = "minecraft:" + str(item_type)
                 block_entity, amount = self.create_chest_block_entity(
@@ -387,7 +294,7 @@ class Modifier:
 
                 chunk_idx_x = chest_x // cfg.CHUNK_B_X
                 chunk_idx_z = chest_z // cfg.CHUNK_B_Z
-                chunk = region.get_chunk(chunk_idx_x, chunk_idx_z)
+                chunk = old_r.get_chunk(chunk_idx_x, chunk_idx_z)
 
                 if chunk.data["TileEntities"].tagID != nbt.TAG_Compound.id:
                     chunk.data["TileEntities"] = nbt.TAG_List(

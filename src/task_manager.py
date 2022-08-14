@@ -12,16 +12,18 @@ from anvil_modifications import save_chunk, save_region, set_chunk
 
 # Own imports
 from classifier_mp import ClassifierMP
+from creator import Creator
 from identifier import Identifier
+from meta_information import MetaInformation
 from modifier import Modifier
 
 
 class TaskManager:
-    def __init__(self, meta_info):
+    def __init__(self, meta_info : MetaInformation):
         self.meta_info = meta_info
 
         self.identifier = Identifier(self.meta_info)
-        self.modifier = Modifier(self.identifier)
+        self.creator = Creator(self.identifier)
 
         # https://tryolabs.com/blog/2013/07/05/run-time-method-patching-python/
         # TODO put this somewhere else?
@@ -74,16 +76,23 @@ class TaskManager:
         self.meta_info.text_queue.put(strftime("%Y-%m-%d %H:%M:%S\n", t1))
         ms = int(round(time.time() * 1000))
 
-        # Get all files in the directory
         src_dir = self.meta_info.source_dir.get()
-        filelist = None
-        if os.path.exists(src_dir):
-            filelist = os.listdir(src_dir)
+        # Check if directory exists
+        if not os.path.exists(src_dir):
+            messagebox.showinfo(
+                message="Source directory does not exist! Select a different source path.",
+                title="Error"
+            )
+            self.meta_info.finished = True
+            return
 
+        # Get all .mca files in the directory
+        filelist = [file for file in os.listdir(src_dir) if file.endswith(".mca")]
         if filelist is None or len(filelist) == 0:
             messagebox.showinfo(
                 message="No files found! Select a different source path.", title="Error"
             )
+            self.meta_info.finished = True
             return
 
         tgt_dir = self.meta_info.target_dir.get()
@@ -96,17 +105,14 @@ class TaskManager:
             )
 
         # Update the progressbar and label for the files
-        self.meta_info.file_count_max = len(filelist)
+        self.meta_info.counts.file_count_max = len(filelist)
 
         # Iterate the files
         i = 1
         for filename in filelist:
-            if filename.endswith(".mca"):
-                # TODO combine path and filename here ?
-                self.process_region(filename)
-            else:
-                continue
-            self.meta_info.file_count = i
+            # TODO combine path and filename here ?
+            self.process_region(filename)
+            self.meta_info.counts.file_count = i
             i += 1
 
         # Print that the process is finished
@@ -129,23 +135,27 @@ class TaskManager:
         rX = int(end[1])
         rZ = int(end[2])
 
+        regions = {}
         # Create a new region with the `EmptyRegion` class at region coords
-        new_region = anvil.EmptyRegion(rX, rZ)
+        regions["new_r"] = anvil.EmptyRegion(rX, rZ)
+        # new_region = anvil.EmptyRegion(rX, rZ)
         src_dir = self.meta_info.source_dir.get()
-        old_region = anvil.Region.from_file(src_dir + "/" + filename)
+        # old_region = anvil.Region.from_file(src_dir + "/" + filename)
+        regions["old_r"] = anvil.Region.from_file(src_dir + "/" + filename)
 
-        repl_region = False
+        regions["repl_r"] = False
         if self.repl_blocks:
             try:
                 repl_dir = self.meta_info.replacement_dir.get()
-                repl_region = anvil.Region.from_file(repl_dir + "/" + filename)
+                regions["repl_r"] = anvil.Region.from_file(repl_dir + "/" + filename)
             except Exception:
+                # TODO
                 print(f"Could not create replacement region for {filename}.")
 
         ##########################################
         # Main function call
         ##########################################
-        self.process_chunks(new_region, old_region, repl_region)
+        self.process_chunks(regions)
 
         if self.water_blocks + self.air_pockets + self.repl_blocks >= 1:
             self.meta_info.text_queue.put(f"In file {filename}:\n")
@@ -168,7 +178,7 @@ class TaskManager:
         # Save region to a file
         self.meta_info.counts.algo_step = cfg.A_SAVE
         target_dir = self.meta_info.target_dir.get()
-        new_region.save(target_dir + "/" + filename)
+        regions["new_r"].save(target_dir + "/" + filename)
         self.meta_info.counts.algo_step = cfg.A_FINISHED
 
         ms2 = int(round(time.time() * 1000))
@@ -176,7 +186,7 @@ class TaskManager:
 
     ###############################################################################################
 
-    def process_chunks(self, new_region, old_region, repl_region):
+    def process_chunks(self, regions):
         ms1 = int(round(time.time() * 1000))
 
         ##################
@@ -187,7 +197,7 @@ class TaskManager:
         self.meta_info.counts.chunks_c.value = 0
         classifier_mp = ClassifierMP(self.meta_info)
         if self.air_pockets + self.repl_blocks + self.water_blocks > 0:
-            classifier_mp.classify_all_mp(old_region, self.meta_info.counts, self.meta_info.timer)
+            classifier_mp.classify_all_mp(regions["old_r"], self.meta_info.counts, self.meta_info.timer)
 
         ms2 = int(round(time.time() * 1000))
         print(f"Classifier time: {ms2 - ms1}")
@@ -203,29 +213,27 @@ class TaskManager:
         ms3 = int(round(time.time() * 1000))
         print(f"Identifier time: {ms3 - ms2}")
 
-        ################
-        # Modification #
-        ################
-        self.meta_info.counts.algo_step = cfg.A_MODIFY
-        self.meta_info.counts.chunks_m.value = 0
-        self.modifier.modify(
-            new_region, old_region, repl_region, self.meta_info.counts, self.meta_info.timer
-        )
-
-        ms4 = int(round(time.time() * 1000))
-        print(f"Modify time: {ms4 - ms3}")
-
         ##########################################
         # Other modifications
         ##########################################
-        # if self.meta_info.make_tunnel()
-        # self.modifier.make_tunnel(
-        #     region, new_region, rX, rZ,
-        #     self.meta_info.get_tunnel_start(), self.meta_info.get_tunnel_end()
-        # )
+        self.meta_info.counts.algo_step = cfg.A_MODIFY
+        modifier = Modifier(self.meta_info, self.identifier)
+        modifier.modify(regions)
         # self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 80, 100], [125, 80, 350])
         # self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 60, 100], [225, 60, 350])
         # self.modifier.make_tunnel(region, new_region, rX, rZ, [125, 100, 100], [325, 100, 250])
 
+        ms4 = int(round(time.time() * 1000))
+        print(f"Modifier time: {ms4 - ms3}")
+
+        ################
+        # Modification #
+        ################
+        self.meta_info.counts.algo_step = cfg.A_CREATE
+        self.meta_info.counts.chunks_m.value = 0
+        self.creator.create_region(
+            regions, self.meta_info.counts, self.meta_info.timer
+        )
+
         ms5 = int(round(time.time() * 1000))
-        print(f"Tunnel time: {ms5 - ms4}")
+        print(f"Creator time: {ms5 - ms4}")

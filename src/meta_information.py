@@ -17,6 +17,7 @@ class MetaInformation:
         self.air_pockets = IntVar()
         self.water_blocks = IntVar()
         self.repl_blocks = IntVar()
+        self.add_tunnel = IntVar()
 
         self.apocket_size = StringVar()
         self.apocket_size.set("1")
@@ -24,6 +25,19 @@ class MetaInformation:
         self.wpocket_size.set("1")
         self.repl_area = StringVar()
         self.repl_area.set("1")
+
+        self.tunnel_start_x = StringVar()
+        self.tunnel_start_x.set("20")
+        self.tunnel_start_y = StringVar()
+        self.tunnel_start_y.set("125")
+        self.tunnel_start_z = StringVar()
+        self.tunnel_start_z.set("10")
+        self.tunnel_end_x = StringVar()
+        self.tunnel_end_x.set("20")
+        self.tunnel_end_y = StringVar()
+        self.tunnel_end_y.set("125")
+        self.tunnel_end_z = StringVar()
+        self.tunnel_end_z.set("200")
 
         self.text_queue = queue.Queue()
 
@@ -50,8 +64,10 @@ class MetaInformation:
             return self.counts.chunks_c.value
         elif self.counts.algo_step == cfg.A_IDENTIFY:
             return self.counts.label_i.value
+        elif self.counts.algo_step == cfg.A_MODIFY:
+            return self.counts.modify
         elif (
-            self.counts.algo_step == cfg.A_MODIFY
+            self.counts.algo_step == cfg.A_CREATE
             or self.counts.algo_step == cfg.A_SAVE
             or self.counts.algo_step == cfg.A_FINISHED
         ):
@@ -66,8 +82,10 @@ class MetaInformation:
             return self.counts.chunk_c_max
         elif self.counts.algo_step == cfg.A_IDENTIFY:
             return self.counts.label_i_max.value
+        elif self.counts.algo_step == cfg.A_MODIFY:
+            return self.counts.modify_max
         elif (
-            self.counts.algo_step == cfg.A_MODIFY
+            self.counts.algo_step == cfg.A_CREATE
             or self.counts.algo_step == cfg.A_SAVE
             or self.counts.algo_step == cfg.A_FINISHED
         ):
@@ -86,10 +104,18 @@ class MetaInformation:
         )
 
     def get_tunnel_start(self):
-        return [175, 90, 250]
+        return [
+            int(self.tunnel_start_x.get()),
+            int(self.tunnel_start_y.get()),
+            int(self.tunnel_start_z.get()),
+        ]
 
     def get_tunnel_end(self):
-        return [400, 90, 250]
+        return [
+            int(self.tunnel_end_x.get()),
+            int(self.tunnel_end_y.get()),
+            int(self.tunnel_end_z.get()),
+        ]
 
 
 class Counts:
@@ -102,9 +128,11 @@ class Counts:
 
         self.chunks_c = Value("i", 0)
         self.label_i = Value("i", 0)
+        self.modify = 0
         self.chunks_m = Value("i", 0)
         self.chunk_c_max = cfg.REGION_C_X * cfg.REGION_C_Z
         self.label_i_max = Value("i", 500)
+        self.modify_max = 1
         self.chunk_m_max = cfg.REGION_C_X * cfg.REGION_C_Z
 
         self.changed_air = Value("i", 0)

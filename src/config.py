@@ -26,8 +26,9 @@ T_SAVE = 180
 A_CLASSIFY = 0
 A_IDENTIFY = 1
 A_MODIFY = 2
-A_SAVE = 3
-A_FINISHED = 4
+A_CREATE = 3
+A_SAVE = 4
+A_FINISHED = 5
 
 # TODO use C for classify globals and I for identify?
 # Classifier types
@@ -48,6 +49,7 @@ UNCHANGED = 0
 WATERBLOCK = 1
 AIRPOCKET = 2
 SOLIDAREA = 3
+TUNNEL = 4
 
 # Modifier
 M_DIR_X = 0

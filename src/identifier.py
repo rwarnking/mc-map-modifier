@@ -25,6 +25,7 @@ class Identifier:
         self.air_pockets = meta_info.air_pockets.get()
         self.water_blocks = meta_info.water_blocks.get()
         self.repl_blocks = meta_info.repl_blocks.get()
+        self.add_tunnel = meta_info.add_tunnel.get()
 
         self.change_count_water = 0
         self.change_count_repl = 0
