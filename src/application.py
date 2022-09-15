@@ -117,8 +117,10 @@ class MainApp:
                 c_z = cfg.REGION_C_Z - 1
                 self.time_label.config(text="Writing File. Estimated rest time: 3 minutes.")
 
-            if (self.meta_info.counts.algo_step != cfg.A_IDENTIFY and
-                self.meta_info.counts.algo_step != cfg.A_MODIFY):
+            if (
+                self.meta_info.counts.algo_step != cfg.A_IDENTIFY and
+                self.meta_info.counts.algo_step != cfg.A_MODIFY
+            ):
                 self.chunk_label.config(
                     text=(
                         f"Finished chunk ({c_x}, {c_z}) of "
@@ -230,8 +232,9 @@ class MainApp:
         l_pad_x2 = (0, e_pad_x2[1] + width * char_size)
         l_pad_x3 = (0, e_pad_x3[1] + width * char_size)
 
-        # TODO add and set var
-        Checkbutton(window, text="Add Tunnel (global coordinates):", variable=self.meta_info.add_tunnel).grid(
+        Checkbutton(
+            window, text="Add Tunnel (global coordinates):", variable=self.meta_info.add_tunnel
+        ).grid(
             row=self.row(), sticky="W", padx=PAD_X
         )
 

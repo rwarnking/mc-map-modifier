@@ -1,17 +1,17 @@
 import anvil  # minecraft import
 import config as cfg  # own import
 from anvil.errors import OutOfBoundsCoordinates
-from block_tests import is_hot, is_repl_block  # own imports
-from nbt import nbt  # minecraft import
-
+from block_tests import is_repl_block  # own imports
 from identifier import Identifier
 from meta_information import Counts
 
-class Creator:
-    def __init__(self, identifier : Identifier):
-        self.identifier = identifier
 
-    def create_region(self, regions, counts : Counts, timer):
+class Creator:
+    def __init__(self, identifier: Identifier):
+        self.identifier = identifier
+        self.stone = anvil.Block("minecraft", "stone")
+
+    def create_region(self, regions, counts: Counts, timer):
         # Iterate all chunks of a region, so the complete region can be copied
         # chunk_z before chunk_x, order matters otherwise the chunks
         # are not in the right direction
@@ -55,7 +55,7 @@ class Creator:
                     print(f"Could not create replacement chunk for {chunk_x}, {chunk_z}.")
 
             new_chunk = new_r.get_chunk(chunk_x, chunk_z)
-            if new_chunk == None:
+            if new_chunk is None:
                 new_chunk = anvil.EmptyChunk(chunk_x, chunk_z)
 
             self.select_chunk_blocks(

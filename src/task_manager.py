@@ -19,7 +19,7 @@ from modifier import Modifier
 
 
 class TaskManager:
-    def __init__(self, meta_info : MetaInformation):
+    def __init__(self, meta_info: MetaInformation):
         self.meta_info = meta_info
 
         self.identifier = Identifier(self.meta_info)
@@ -81,7 +81,7 @@ class TaskManager:
         if not os.path.exists(src_dir):
             messagebox.showinfo(
                 message="Source directory does not exist! Select a different source path.",
-                title="Error"
+                title="Error",
             )
             self.meta_info.finished = True
             return
@@ -197,7 +197,9 @@ class TaskManager:
         self.meta_info.counts.chunks_c.value = 0
         classifier_mp = ClassifierMP(self.meta_info)
         if self.air_pockets + self.repl_blocks + self.water_blocks > 0:
-            classifier_mp.classify_all_mp(regions["old_r"], self.meta_info.counts, self.meta_info.timer)
+            classifier_mp.classify_all_mp(
+                regions["old_r"], self.meta_info.counts, self.meta_info.timer
+            )
 
         ms2 = int(round(time.time() * 1000))
         print(f"Classifier time: {ms2 - ms1}")
@@ -231,9 +233,7 @@ class TaskManager:
         ################
         self.meta_info.counts.algo_step = cfg.A_CREATE
         self.meta_info.counts.chunks_m.value = 0
-        self.creator.create_region(
-            regions, self.meta_info.counts, self.meta_info.timer
-        )
+        self.creator.create_region(regions, self.meta_info.counts, self.meta_info.timer)
 
         ms5 = int(round(time.time() * 1000))
         print(f"Creator time: {ms5 - ms4}")

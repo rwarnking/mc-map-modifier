@@ -38,9 +38,6 @@ class Identifier:
     def identify(self, c_regions, counts, timer):
         identified_shared = self.mp_helper.init_shared(cfg.REGION_B_TOTAL)
 
-        self.identified = self.mp_helper.tonumpyarray(identified_shared)
-        self.identified.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
-
         if self.air_pockets == 1:
             self.label_air(identified_shared, c_regions[cfg.C_A_AIR], counts, timer)
         if self.repl_blocks == 1:
@@ -49,6 +46,11 @@ class Identifier:
         # water pockets due to replacement
         if self.water_blocks == 1:
             self.label_water(identified_shared, c_regions[cfg.C_A_WATER], counts, timer)
+
+        # Save a not shared version, do not use before the processing,
+        # to circumvent array copying
+        self.identified = self.mp_helper.tonumpyarray(identified_shared)
+        self.identified.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
 
     ###############################################################################################
     # Labeling functions
@@ -67,8 +69,10 @@ class Identifier:
             return
         elif num < cfg.PROCESSES * 5:
             valid = self.validator_air
+            i_shared = self.mp_helper.tonumpyarray(identified_shared)
+            i_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
             self.fill_labels_sp(
-                self.identified, labeled, c_region, counts, counts.changed_air, valid, timer, num
+                i_shared, labeled, c_region, counts, counts.changed_air, valid, timer, num
             )
         else:
             self.fill_labels_mp(
@@ -89,8 +93,10 @@ class Identifier:
             return
         elif num < cfg.PROCESSES * 5:
             valid = self.validator_water
+            i_shared = self.mp_helper.tonumpyarray(identified_shared)
+            i_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
             self.fill_labels_sp(
-                self.identified, labeled, c_region, counts, counts.changed_water, valid, timer, num
+                i_shared, labeled, c_region, counts, counts.changed_water, valid, timer, num
             )
         else:
             self.fill_labels_mp(
@@ -121,8 +127,10 @@ class Identifier:
             return
         elif num < cfg.PROCESSES * 5:
             valid = self.validator_repl
+            i_shared = self.mp_helper.tonumpyarray(identified_shared)
+            i_shared.shape = (cfg.REGION_B_X, cfg.REGION_B_Y, cfg.REGION_B_Z)
             self.fill_labels_sp(
-                self.identified, labeled, c_region, counts, counts.changed_repl, valid, timer, num
+                i_shared, labeled, c_region, counts, counts.changed_repl, valid, timer, num
             )
         else:
             self.fill_labels_mp(
@@ -134,7 +142,7 @@ class Identifier:
     ###############################################################################################
     # TODO the region is only used inside the validator, use self.region?
     def fill_labels_sp(
-        self, i_array, l_array, c_array, counts, changed, validator, timer, end, begin=1
+        self, i_array, l_array, c_region, counts, changed, validator, timer, end, begin=1
     ):
         timer.start2_time()
         for idx in range(begin, end + 1):

@@ -1,13 +1,13 @@
-import anvil  # minecraft import
 import math
 import zlib
 from io import BytesIO
 from typing import Optional
 
+import anvil  # minecraft import
 from nbt import nbt
 
 
-def set_chunk(self : anvil.EmptyRegion, chunk : anvil.EmptyChunk, region : anvil.Region):
+def set_chunk(self: anvil.EmptyRegion, chunk: anvil.EmptyChunk, region: anvil.Region):
     # Store the chunks data as zlib compressed nbt data
     if chunk is None:
         self.chunks_data.append(None)

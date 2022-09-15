@@ -1,14 +1,14 @@
 import anvil  # minecraft import
 import config as cfg  # own import
-from anvil.errors import OutOfBoundsCoordinates
 from block_tests import is_hot, is_repl_block  # own imports
-from nbt import nbt  # minecraft import
 
 from identifier import Identifier
 from meta_information import MetaInformation
+from nbt import nbt  # minecraft import
+
 
 class Modifier:
-    def __init__(self, meta_info : MetaInformation, identifier : Identifier):
+    def __init__(self, meta_info: MetaInformation, identifier: Identifier):
         self.identifier = identifier
         self.add_tunnel = meta_info.add_tunnel.get()
 
